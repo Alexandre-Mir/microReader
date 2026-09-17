@@ -17,7 +17,7 @@ export class ReadingModal extends Modal {
     app: App,
     initialFile: TFile,
     private data: PluginData,
-    private onSaveData: () => Promise<void>
+    private onSaveData: () => Promise<void>,
   ) {
     super(app);
     this.currentFile = initialFile;
@@ -88,7 +88,10 @@ export class ReadingModal extends Modal {
         contentEl.createEl("p", {
           text: `Você analisou e reescreveu todos os parágrafos de "${this.currentFile.basename}".`,
         });
-        const closeBtn = contentEl.createEl("button", { text: "Fechar", cls: "mod-cta" });
+        const closeBtn = contentEl.createEl("button", {
+          text: "Fechar",
+          cls: "mod-cta",
+        });
         closeBtn.onclick = () => this.close();
         return;
       }
@@ -98,7 +101,9 @@ export class ReadingModal extends Modal {
 
     // Barra de Navegação Superior
     const navBar = contentEl.createDiv({ cls: "microreader-navbar" });
-    const titleEl = navBar.createEl("h3", { text: `📖 ${this.currentFile.basename}` });
+    const titleEl = navBar.createEl("h3", {
+      text: `📖 ${this.currentFile.basename}`,
+    });
     if (this.fileStack.length > 1) {
       navBar.createEl("span", {
         text: ` (Nível ${this.fileStack.length} da Pilha Recursiva)`,
@@ -112,19 +117,29 @@ export class ReadingModal extends Modal {
     });
 
     // Barra de Progresso
-    const progressContainer = contentEl.createDiv({ cls: "microreader-progressbar-bg" });
-    const progressBar = progressContainer.createDiv({ cls: "microreader-progressbar-fill" });
+    const progressContainer = contentEl.createDiv({
+      cls: "microreader-progressbar-bg",
+    });
+    const progressBar = progressContainer.createDiv({
+      cls: "microreader-progressbar-fill",
+    });
     const pct = Math.round((this.currentIdx / this.paragraphs.length) * 100);
     progressBar.style.width = `${pct}%`;
 
     // Box do Parágrafo em Foco com Tipografia Ampla
-    const paragraphCard = contentEl.createDiv({ cls: "microreader-focus-card" });
-    const pTextEl = paragraphCard.createDiv({ cls: "microreader-paragraph-text" });
+    const paragraphCard = contentEl.createDiv({
+      cls: "microreader-focus-card",
+    });
+    const pTextEl = paragraphCard.createDiv({
+      cls: "microreader-paragraph-text",
+    });
     this.renderParagraphWithFootnotes(pTextEl, currentParagraph.text);
 
     // Links Internos [[x]] se houver no parágrafo
     if (currentParagraph.internalLinks.length > 0) {
-      const linkBox = paragraphCard.createDiv({ cls: "microreader-internal-links-box" });
+      const linkBox = paragraphCard.createDiv({
+        cls: "microreader-internal-links-box",
+      });
       linkBox.createEl("span", { text: "🔗 Aprofundar Leitura Recursiva: " });
       for (const linkName of currentParagraph.internalLinks) {
         const linkBtn = linkBox.createEl("button", {
@@ -132,13 +147,23 @@ export class ReadingModal extends Modal {
           cls: "microreader-link-button",
         });
         linkBtn.onclick = async () => {
-          const targetFile = this.app.metadataCache.getFirstLinkpathDest(linkName, this.currentFile.path);
+          const targetFile = this.app.metadataCache.getFirstLinkpathDest(
+            linkName,
+            this.currentFile.path,
+          );
           if (targetFile instanceof TFile) {
-            if (this.zettelManager.hasZettelTag(targetFile, this.data.settings.requiredTag)) {
+            if (
+              this.zettelManager.hasZettelTag(
+                targetFile,
+                this.data.settings.requiredTag,
+              )
+            ) {
               this.fileStack.push(targetFile);
               await this.loadFile(targetFile);
             } else {
-              new Notice(`A nota [[${linkName}]] não possui a tag #${this.data.settings.requiredTag}`);
+              new Notice(
+                `A nota [[${linkName}]] não possui a tag #${this.data.settings.requiredTag}`,
+              );
             }
           } else {
             new Notice(`Nota não encontrada: [[${linkName}]]`);
@@ -161,15 +186,21 @@ export class ReadingModal extends Modal {
       text: "✂️ Desmembrar Seleção (Inserir '---')",
       cls: "microreader-btn-tool",
     });
-    setTooltip(btnSplitSelection, "Insere um delimitador '---' em volta do texto selecionado para criar notas Zettel separadas");
+    setTooltip(
+      btnSplitSelection,
+      "Insere um delimitador '---' em volta do texto selecionado para criar notas Zettel separadas",
+    );
 
     const textarea = formCard.createEl("textarea", {
-      placeholder: "Digite sua síntese... Para criar duas ou mais notas atômicas independentes, separe os trechos com '---'.",
+      placeholder:
+        "Digite sua síntese... Para criar duas ou mais notas atômicas independentes, separe os trechos com '---'.",
       cls: "microreader-textarea",
     });
 
     // Container dinâmico para os títulos das notas geradas
-    const titlesContainer = formCard.createDiv({ cls: "microreader-titles-container" });
+    const titlesContainer = formCard.createDiv({
+      cls: "microreader-titles-container",
+    });
 
     // Função que divide o texto em seções usando '---'
     const getSections = (): string[] => {
@@ -212,8 +243,13 @@ export class ReadingModal extends Modal {
           });
 
           for (let i = 0; i < count; i++) {
-            const row = titlesContainer.createDiv({ cls: "microreader-multi-title-row" });
-            row.createEl("span", { text: `Nota #${i + 1}:`, cls: "microreader-badge-num" });
+            const row = titlesContainer.createDiv({
+              cls: "microreader-multi-title-row",
+            });
+            row.createEl("span", {
+              text: `Nota #${i + 1}:`,
+              cls: "microreader-badge-num",
+            });
             const inp = row.createEl("input", {
               type: "text",
               placeholder: `ex: [[Título da Ideia ${i + 1}]]`,
@@ -263,7 +299,10 @@ export class ReadingModal extends Modal {
       text: "🗑️ Ignorar Parágrafo",
       cls: "microreader-btn-danger",
     });
-    setTooltip(btnIgnore, "Descarta este parágrafo sem criar revisão nem nota Zettel");
+    setTooltip(
+      btnIgnore,
+      "Descarta este parágrafo sem criar revisão nem nota Zettel",
+    );
     btnIgnore.onclick = async () => {
       docState.ignoredParagraphs.push(this.currentIdx);
       docState.currentParagraphIndex = this.currentIdx + 1;
@@ -277,26 +316,47 @@ export class ReadingModal extends Modal {
       text: "🔗 Mesclar com Nota Existente",
       cls: "microreader-btn-merge",
     });
-    setTooltip(btnMerge, "Anexa esta síntese a uma nota com #zettel já existente no Vault");
+    setTooltip(
+      btnMerge,
+      "Anexa esta síntese a uma nota com #zettel já existente no Vault",
+    );
     btnMerge.onclick = () => {
-      const zettelFiles = this.zettelManager.getAllZettelFiles(this.data.settings.requiredTag);
+      const zettelFiles = this.zettelManager.getAllZettelFiles(
+        this.data.settings.requiredTag,
+      );
       new ZettelSuggestModal(this.app, zettelFiles, async (chosen) => {
         const text = textarea.value.trim();
         if (text.split(/\s+/).length < this.data.settings.minRewriteWords) {
-          new Notice(`Escreva ao menos ${this.data.settings.minRewriteWords} palavras antes de mesclar.`);
+          new Notice(
+            `Escreva ao menos ${this.data.settings.minRewriteWords} palavras antes de mesclar.`,
+          );
           return;
         }
 
         // Anexa na nota existente
-        await this.zettelManager.mergeWithExistingZettel(chosen, text, this.currentFile);
+        await this.zettelManager.mergeWithExistingZettel(
+          chosen,
+          text,
+          this.currentFile,
+        );
         // Substitui parágrafo no arquivo original
-        await this.zettelManager.replaceParagraphWithLink(this.currentFile, currentParagraph.text, chosen.basename);
+        await this.zettelManager.replaceParagraphWithLink(
+          this.currentFile,
+          currentParagraph.text,
+          chosen.basename,
+        );
 
-        await this.scheduleReviewAndAdvance([chosen.basename], currentParagraph, [text]);
+        await this.scheduleReviewAndAdvance(
+          [chosen.basename],
+          currentParagraph,
+          [text],
+        );
       }).open();
     };
 
-    const statusLabel = actionRow.createEl("span", { cls: "microreader-status-label" });
+    const statusLabel = actionRow.createEl("span", {
+      cls: "microreader-status-label",
+    });
 
     // Botão Criar Nota e Avançar
     const btnSubmit = actionRow.createEl("button", {
@@ -306,29 +366,60 @@ export class ReadingModal extends Modal {
     btnSubmit.disabled = true;
 
     const validate = () => {
+      let hasHighSimilarity = false;
+      let maxFoundSimilarity = 0;
+
       const sections = getSections();
       const count = Math.max(1, sections.length);
-      const totalWords = textarea.value.trim().split(/\s+/).filter((w) => w.length > 0).length;
+      const totalWords = textarea.value
+        .trim()
+        .split(/\s+/)
+        .filter((w) => w.length > 0).length;
 
-      if (totalWords < this.data.settings.minRewriteWords) {
-        statusLabel.setText(`Mínimo de ${this.data.settings.minRewriteWords} palavras (${totalWords}/${this.data.settings.minRewriteWords})`);
-        btnSubmit.disabled = true;
-        return false;
-      }
-
-      for (let i = 0; i < count; i++) {
-        const inp = titleInputs[i];
-        if (!inp || inp.value.trim().length < 2) {
-          statusLabel.setText(`⚠️ Defina o título da Nota #${i + 1}`);
-          btnSubmit.disabled = true;
-          return false;
+      for (const section of sections) {
+        const similarity = TextSimilarity.calculateSimilarityPercent(
+          currentParagraph.text,
+          textarea.value,
+        );
+        if (similarity > maxFoundSimilarity) {
+          maxFoundSimilarity = similarity;
+        }
+        if (similarity > this.data.settings.maxSimilarityPercent) {
+          hasHighSimilarity = true;
         }
       }
 
-      const noteStr = count > 1 ? `${count} notas desmembradas` : "1 nota";
-      statusLabel.setText(`✓ Pronto para criar ${noteStr} (${totalWords} palavras)`);
-      btnSubmit.disabled = false;
-      return true;
+      if (hasHighSimilarity) {
+        btnSubmit.disabled = true;
+        statusLabel.setText(
+          `⚠️ Muito parecido com o original (${maxFoundSimilarity}% de similaridade, máx. ${this.data.settings.maxSimilarityPercent}%)`,
+        );
+        statusLabel.addClass("is-error");
+      } else {
+        if (totalWords < this.data.settings.minRewriteWords) {
+          statusLabel.setText(
+            `Mínimo de ${this.data.settings.minRewriteWords} palavras (${totalWords}/${this.data.settings.minRewriteWords})`,
+          );
+          btnSubmit.disabled = true;
+          return false;
+        }
+
+        for (let i = 0; i < count; i++) {
+          const inp = titleInputs[i];
+          if (!inp || inp.value.trim().length < 2) {
+            statusLabel.setText(`⚠️ Defina o título da Nota #${i + 1}`);
+            btnSubmit.disabled = true;
+            return false;
+          }
+        }
+
+        const noteStr = count > 1 ? `${count} notas desmembradas` : "1 nota";
+        statusLabel.setText(
+          `✓ Pronto para criar ${noteStr} (${totalWords} palavras)`,
+        );
+        btnSubmit.disabled = false;
+        return true;
+      }
     };
 
     textarea.oninput = () => {
@@ -350,12 +441,16 @@ export class ReadingModal extends Modal {
           titles[i],
           sections[i],
           this.currentFile,
-          this.data.settings.requiredTag
+          this.data.settings.requiredTag,
         );
       }
 
       // 2. Substitui no arquivo de origem pelos links de todas as notas criadas: [[Nota 1]] [[Nota 2]]
-      await this.zettelManager.replaceParagraphWithLinks(this.currentFile, currentParagraph.text, titles);
+      await this.zettelManager.replaceParagraphWithLinks(
+        this.currentFile,
+        currentParagraph.text,
+        titles,
+      );
 
       // 3. Agenda revisões SM-2 para cada nota desmembrada e avança
       await this.scheduleReviewAndAdvance(titles, currentParagraph, sections);
@@ -373,7 +468,11 @@ export class ReadingModal extends Modal {
     setTimeout(() => textarea.focus(), 50);
   }
 
-  private async scheduleReviewAndAdvance(zettelTitles: string[], block: ParagraphBlock, rewrittenSections: string[]) {
+  private async scheduleReviewAndAdvance(
+    zettelTitles: string[],
+    block: ParagraphBlock,
+    rewrittenSections: string[],
+  ) {
     const docState = this.data.documents[this.currentFile.path];
 
     // Registra uma revisão SM-2 para cada nota desmembrada
