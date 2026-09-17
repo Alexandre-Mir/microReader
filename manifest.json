@@ -1,0 +1,9 @@
+{
+  "id": "obsidian-microreader",
+  "name": "microReader — Zettelkasten & SuperMemo Reader",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Leitura ativa e incremental parágrafo por parágrafo, combinando Zettelkasten atômico (#zettel) e repetição espaçada SM-2.",
+  "author": "microReader",
+  "isDesktopOnly": false
+}

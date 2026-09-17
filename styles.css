@@ -1,0 +1,356 @@
+/* Estilos personalizados do microReader para Obsidian */
+
+/* Container Zen de Leitura */
+.microreader-zen-modal {
+  width: 90vw !important;
+  max-width: 960px !important;
+  border-radius: 12px;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.microreader-reading-container {
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Barra Superior de Navegação */
+.microreader-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 12px;
+}
+
+.microreader-navbar h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--text-normal);
+}
+
+.microreader-progress-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.microreader-stack-level {
+  font-size: 0.85rem;
+  color: var(--interactive-accent);
+  margin-left: 8px;
+}
+
+/* Barra de Progresso Suave */
+.microreader-progressbar-bg {
+  width: 100%;
+  height: 6px;
+  background-color: var(--background-modifier-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.microreader-progressbar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--interactive-accent), #04d361);
+  transition: width 0.3s ease;
+}
+
+/* Card do Parágrafo em Foco com Tipografia Ampla */
+.microreader-focus-card {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 28px 32px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.microreader-paragraph-text {
+  font-size: 1.25rem !important; /* ~20px para leitura confortável */
+  line-height: 1.85 !important;
+  color: var(--text-normal) !important;
+  max-width: 74ch; /* Measure ótimo para os olhos */
+  margin: 0 auto;
+  font-family: var(--font-text);
+  word-break: break-word;
+}
+
+/* Badges de Notas de Rodapé [^1] com Tooltip */
+.microreader-footnote-badge {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin: 0 4px;
+  cursor: pointer;
+  display: inline-block;
+  vertical-align: super;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.microreader-footnote-badge:hover {
+  transform: scale(1.1);
+  opacity: 0.9;
+}
+
+/* Links Internos [[x]] no Parágrafo */
+.microreader-internal-links-box {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--background-modifier-border);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+
+.microreader-link-button {
+  background-color: var(--background-primary);
+  border: 1px solid var(--interactive-accent);
+  color: var(--interactive-accent);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: background-color 0.15s ease;
+}
+
+.microreader-link-button:hover {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* Formulário de Reescrita Zettelkasten */
+.microreader-form-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.microreader-field-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-accent);
+  margin-top: 6px;
+}
+
+.microreader-tools-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.microreader-btn-tool {
+  background-color: var(--background-secondary) !important;
+  color: var(--interactive-accent) !important;
+  border: 1px dashed var(--interactive-accent) !important;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.microreader-btn-tool:hover {
+  background-color: var(--interactive-accent) !important;
+  color: var(--text-on-accent) !important;
+  border-style: solid !important;
+}
+
+.microreader-titles-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.microreader-highlight-text {
+  color: var(--interactive-accent) !important;
+}
+
+.microreader-multi-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.microreader-badge-num {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 65px;
+}
+
+.microreader-title-input {
+  width: 100%;
+  font-size: 1.05rem;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.microreader-title-input:focus {
+  border-color: var(--interactive-accent);
+}
+
+.microreader-textarea {
+  width: 100%;
+  min-height: 120px;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  padding: 14px;
+  border-radius: 8px;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  font-family: var(--font-text);
+  resize: vertical;
+}
+
+.microreader-textarea:focus {
+  border-color: var(--interactive-accent);
+}
+
+/* Linha de Ações */
+.microreader-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.microreader-status-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-right: auto;
+}
+
+.microreader-btn-danger {
+  background-color: rgba(235, 87, 87, 0.15) !important;
+  color: #eb5757 !important;
+  border: 1px solid rgba(235, 87, 87, 0.4) !important;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.microreader-btn-danger:hover {
+  background-color: rgba(235, 87, 87, 0.3) !important;
+}
+
+.microreader-btn-merge {
+  background-color: var(--background-secondary) !important;
+  color: var(--text-normal) !important;
+  border: 1px solid var(--background-modifier-border) !important;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.microreader-btn-merge:hover {
+  background-color: var(--background-modifier-hover) !important;
+}
+
+/* Modal de Revisão & Gatekeeper */
+.microreader-gatekeeper-banner {
+  background-color: rgba(255, 159, 67, 0.15);
+  border: 1px solid rgba(255, 159, 67, 0.4);
+  color: #ff9f43;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.microreader-card {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.microreader-title {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--interactive-accent);
+}
+
+.microreader-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.microreader-display-box {
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 14px 18px;
+  font-size: 1.1rem;
+  line-height: 1.65;
+  color: var(--text-normal);
+}
+
+.microreader-highlight-box {
+  border-color: rgba(4, 211, 97, 0.4);
+  background-color: rgba(4, 211, 97, 0.05);
+}
+
+.microreader-rating-label {
+  font-weight: 600;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+.microreader-ratings-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.microreader-ratings-row button {
+  flex: 1;
+  padding: 10px 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  color: #fff;
+  transition: opacity 0.15s ease;
+}
+
+.microreader-ratings-row button:hover {
+  opacity: 0.85;
+}
+
+.mr-btn-0 { background-color: #e53935; }
+.mr-btn-1 { background-color: #fb8c00; }
+.mr-btn-2 { background-color: #fdd835; color: #111 !important; }
+.mr-btn-3 { background-color: #43a047; }
+.mr-btn-4 { background-color: #1e88e5; }
+.mr-btn-5 { background-color: #8e24aa; }
+
+.microreader-suggest-title {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.microreader-suggest-path {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
