@@ -10,6 +10,11 @@ export interface ReviewItem {
   easinessFactor: number;
   dueDate: string; // YYYY-MM-DD
   lastReviewedAt?: string;
+  stageIndex: number; // -100 a +100, começa em 0
+  lastDirection: "up" | "down" | null; // direção do último toque (null = ainda não revisado)
+  lastStep: number; // tamanho do último passo aplicado (começa em 0)
+  resetCount: number; // quantas vezes esse Zettel já bateu +100
+  isLeech: boolean; // true qunado resetCount >= limiar configurado
 }
 
 export interface DocumentState {
@@ -28,7 +33,8 @@ export interface MicroReaderSettings {
   maxSimilarityPercent: number; // padrão: 55 (%)
   autoTagZettel: boolean;
   requiredTag: string; // padrão: 'zettel'
-  fontSizePx: number;  // padrão: 20
+  fontSizePx: number; // padrão: 20
+  leechThreshold: number; // quantos resets até virar leech (defautl: 3)
 }
 
 export interface PluginData {

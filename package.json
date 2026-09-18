@@ -5,16 +5,26 @@
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "node esbuild.config.mjs production"
+    "build": "node esbuild.config.mjs production",
+    "test": "jest"
   },
-  "keywords": ["obsidian", "plugin", "supermemo", "zettelkasten", "spaced-repetition"],
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "supermemo",
+    "zettelkasten",
+    "spaced-repetition"
+  ],
   "author": "microReader",
   "license": "MIT",
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.11.0",
     "builtin-modules": "^3.3.0",
     "esbuild": "0.20.0",
+    "jest": "^30.5.1",
     "obsidian": "latest",
+    "ts-jest": "^29.4.12",
     "tslib": "2.6.2",
     "typescript": "^5.3.3"
   }

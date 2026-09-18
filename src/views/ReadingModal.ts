@@ -491,6 +491,11 @@ export class ReadingModal extends Modal {
         intervalDays: 1,
         easinessFactor: 2.5,
         dueDate: getTomorrowString(),
+        stageIndex: 0,
+        lastDirection: null,
+        lastStep: 0,
+        resetCount: 0,
+        isLeech: false,
       });
     }
 

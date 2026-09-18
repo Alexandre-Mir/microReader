@@ -35,7 +35,9 @@ export class SM2Engine {
 
     if (quota <= 0) return [];
 
-    const eligible = data.reviews.filter((r) => r.dueDate <= today);
+    const eligible = data.reviews.filter(
+      (r) => r.dueDate <= today && !r.isLeech,
+    );
     // Ordena pelas mais antigas e id
     eligible.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
     return eligible.slice(0, quota);
@@ -45,13 +47,48 @@ export class SM2Engine {
     return SM2Engine.getPendingReviews(data).length > 0;
   }
 
-  static processReviewResult(item: ReviewItem, quality: number): ReviewItem {
-    let q = Math.max(0, Math.min(5, quality));
+  static processIncrementalReview(
+    item: ReviewItem,
+    direction: "up" | "down",
+    leechThreshold: number,
+  ): ReviewItem {
+    // calcula o tamanho do passo: dobra se repetiu a mesma direção, senão volta a 1
+    const step = direction === item.lastDirection ? item.lastStep * 2 : 1;
+
+    // aplica o passo ao stageIndex, saturando em -100 / +100
+
+    let newStageIndex = item.stageIndex;
+    if (direction === "up") {
+      newStageIndex = Math.min(100, item.stageIndex + step);
+    } else {
+      newStageIndex = Math.max(-100, item.stageIndex - step);
+    }
+
+    // se bateu o teto (+100), dispara o reset de "esqueci"
+    if (newStageIndex >= 100) {
+      const newResetCount = item.resetCount + 1;
+      return {
+        ...item,
+        stageIndex: 0,
+        lastDirection: null,
+        lastStep: 0,
+        resetCount: newResetCount,
+        isLeech: newResetCount >= leechThreshold,
+        repetitionNumber: 0,
+        intervalDays: 1,
+        dueDate: getTomorrowString(),
+        lastReviewedAt: new Date().toISOString(),
+      };
+    }
+
+    // caso normal: converte o stageIndex numa qualidade SM-2
+    const q = 2.5 - (newStageIndex / 100) * 2.5;
+
+    // roda a fórmula clássica dp SM-2 com esse q
     let rep = item.repetitionNumber;
     let interval = item.intervalDays;
     let ef = item.easinessFactor;
 
-    // Fórmula SM-2 para Easiness Factor
     ef = ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
     if (ef < 1.3) ef = 1.3;
 
@@ -74,6 +111,9 @@ export class SM2Engine {
 
     return {
       ...item,
+      stageIndex: newStageIndex,
+      lastDirection: direction,
+      lastStep: step,
       repetitionNumber: rep,
       intervalDays: interval,
       easinessFactor: ef,

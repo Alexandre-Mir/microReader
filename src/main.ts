@@ -1,4 +1,11 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile, Notice } from "obsidian";
+import {
+  App,
+  Plugin,
+  PluginSettingTab,
+  Setting,
+  TFile,
+  Notice,
+} from "obsidian";
 import { PluginData, MicroReaderSettings } from "./types";
 import { SM2Engine } from "./sm2";
 import { ZettelManager } from "./zettelManager";
@@ -12,6 +19,7 @@ const DEFAULT_SETTINGS: MicroReaderSettings = {
   autoTagZettel: true,
   requiredTag: "zettel",
   fontSizePx: 20,
+  leechThreshold: 3,
 };
 
 const DEFAULT_DATA: PluginData = {
@@ -30,9 +38,13 @@ export default class MicroReaderPlugin extends Plugin {
     this.zettelManager = new ZettelManager(this.app);
 
     // Ícone no Ribbon (barra lateral)
-    this.addRibbonIcon("book-open", "microReader: Iniciar Leitura Incremental", () => {
-      this.startIncrementalReading();
-    });
+    this.addRibbonIcon(
+      "book-open",
+      "microReader: Iniciar Leitura Incremental",
+      () => {
+        this.startIncrementalReading();
+      },
+    );
 
     // Comandos na Command Palette
     this.addCommand({
@@ -60,7 +72,7 @@ export default class MicroReaderPlugin extends Plugin {
           () => this.savePluginData(),
           () => {
             new Notice("Fila de revisões limpa!");
-          }
+          },
         ).open();
       },
     });
@@ -71,7 +83,9 @@ export default class MicroReaderPlugin extends Plugin {
   async startIncrementalReading(file?: TFile) {
     // 1. Verificação do Gatekeeper: se houver revisões pendentes, força a revisão primeiro!
     if (SM2Engine.hasPendingReviews(this.data)) {
-      new Notice("⚠️ Gatekeeper Ativo: Complete as revisões diárias antes de iniciar nova leitura.");
+      new Notice(
+        "⚠️ Gatekeeper Ativo: Complete as revisões diárias antes de iniciar nova leitura.",
+      );
       new ReviewModal(
         this.app,
         this.data,
@@ -79,7 +93,7 @@ export default class MicroReaderPlugin extends Plugin {
         () => {
           // Callback ao terminar as revisões do dia: abre a leitura
           this.openReadingForFile(file);
-        }
+        },
       ).open();
       return;
     }
@@ -95,18 +109,31 @@ export default class MicroReaderPlugin extends Plugin {
     }
 
     // 2. Filtro estrito pela tag exigida (#zettel)
-    if (!this.zettelManager.hasZettelTag(targetFile, this.data.settings.requiredTag)) {
-      new Notice(`A nota "${targetFile.basename}" precisa ter a tag #${this.data.settings.requiredTag} para ser lida no microReader.`);
+    if (
+      !this.zettelManager.hasZettelTag(
+        targetFile,
+        this.data.settings.requiredTag,
+      )
+    ) {
+      new Notice(
+        `A nota "${targetFile.basename}" precisa ter a tag #${this.data.settings.requiredTag} para ser lida no microReader.`,
+      );
       return;
     }
 
     // Abre a interface de leitura
-    new ReadingModal(this.app, targetFile, this.data, () => this.savePluginData()).open();
+    new ReadingModal(this.app, targetFile, this.data, () =>
+      this.savePluginData(),
+    ).open();
   }
 
   async loadPluginData() {
     this.data = Object.assign({}, DEFAULT_DATA, await this.loadData());
-    this.data.settings = Object.assign({}, DEFAULT_SETTINGS, this.data.settings);
+    this.data.settings = Object.assign(
+      {},
+      DEFAULT_SETTINGS,
+      this.data.settings,
+    );
   }
 
   async savePluginData() {
@@ -129,7 +156,9 @@ class MicroReaderSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Limite Máximo Diário de Revisões")
-      .setDesc("Número máximo de revisões apresentadas por dia para prevenir estafa e sobrecarga.")
+      .setDesc(
+        "Número máximo de revisões apresentadas por dia para prevenir estafa e sobrecarga.",
+      )
       .addText((text) =>
         text
           .setValue(String(this.plugin.data.settings.maxReviewsPerDay))
@@ -139,24 +168,30 @@ class MicroReaderSettingTab extends PluginSettingTab {
               this.plugin.data.settings.maxReviewsPerDay = num;
               await this.plugin.savePluginData();
             }
-          })
+          }),
       );
 
     new Setting(containerEl)
       .setName("Tag Obrigatória para Leitura")
-      .setDesc("Apenas notas que possuam esta tag serão consideradas pelo leitor.")
+      .setDesc(
+        "Apenas notas que possuam esta tag serão consideradas pelo leitor.",
+      )
       .addText((text) =>
         text
           .setValue(this.plugin.data.settings.requiredTag)
           .onChange(async (val) => {
-            this.plugin.data.settings.requiredTag = val.replace(/^#/, "").trim();
+            this.plugin.data.settings.requiredTag = val
+              .replace(/^#/, "")
+              .trim();
             await this.plugin.savePluginData();
-          })
+          }),
       );
 
     new Setting(containerEl)
       .setName("Mínimo de Palavras na Reescrita")
-      .setDesc("Exigência mínima de elaboração ativa para poder criar a nota Zettel e avançar.")
+      .setDesc(
+        "Exigência mínima de elaboração ativa para poder criar a nota Zettel e avançar.",
+      )
       .addText((text) =>
         text
           .setValue(String(this.plugin.data.settings.minRewriteWords))
@@ -166,12 +201,14 @@ class MicroReaderSettingTab extends PluginSettingTab {
               this.plugin.data.settings.minRewriteWords = num;
               await this.plugin.savePluginData();
             }
-          })
+          }),
       );
 
     new Setting(containerEl)
       .setName("Similaridade Máxima Permitida (%)")
-      .setDesc("Bloqueia o avanço caso a similaridade (N-gramas) com o parágrafo original exceda esta porcentagem. Padrão: 55%.")
+      .setDesc(
+        "Bloqueia o avanço caso a similaridade (N-gramas) com o parágrafo original exceda esta porcentagem. Padrão: 55%.",
+      )
       .addText((text) =>
         text
           .setValue(String(this.plugin.data.settings.maxSimilarityPercent))
@@ -181,7 +218,7 @@ class MicroReaderSettingTab extends PluginSettingTab {
               this.plugin.data.settings.maxSimilarityPercent = num;
               await this.plugin.savePluginData();
             }
-          })
+          }),
       );
   }
 }

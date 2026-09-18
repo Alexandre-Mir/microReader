@@ -10,7 +10,7 @@ export class ReviewModal extends Modal {
     app: App,
     private data: PluginData,
     private onSaveData: () => Promise<void>,
-    private onCompletedAll: () => void
+    private onCompletedAll: () => void,
   ) {
     super(app);
     this.pendingReviews = SM2Engine.getPendingReviews(this.data);
@@ -23,8 +23,13 @@ export class ReviewModal extends Modal {
 
     if (this.pendingReviews.length === 0) {
       contentEl.createEl("h2", { text: "🎉 Nenhuma revisão pendente!" });
-      contentEl.createEl("p", { text: "Sua fila diária está limpa. Você pode prosseguir com as leituras novas." });
-      const btn = contentEl.createEl("button", { text: "Iniciar Leitura", cls: "mod-cta" });
+      contentEl.createEl("p", {
+        text: "Sua fila diária está limpa. Você pode prosseguir com as leituras novas.",
+      });
+      const btn = contentEl.createEl("button", {
+        text: "Iniciar Leitura",
+        cls: "mod-cta",
+      });
       btn.onclick = () => {
         this.close();
         this.onCompletedAll();
@@ -43,14 +48,25 @@ export class ReviewModal extends Modal {
     const total = this.pendingReviews.length;
 
     // Alerta do Gatekeeper
-    const alertBox = contentEl.createDiv({ cls: "microreader-gatekeeper-banner" });
+    const alertBox = contentEl.createDiv({
+      cls: "microreader-gatekeeper-banner",
+    });
     alertBox.createEl("span", {
       text: `⚠️ Gatekeeper Ativo: Revisão ${this.currentIdx + 1} de ${total}. Conclua para liberar nova leitura.`,
     });
 
     const card = contentEl.createDiv({ cls: "microreader-card" });
 
-    card.createEl("h3", { text: `Nota: [[${item.zettelTitle}]]`, cls: "microreader-title" });
+    card.createEl("h3", {
+      text: `Nota: [[${item.zettelTitle}]]`,
+      cls: "microreader-title",
+    });
+    if (item.resetCount > 0) {
+      card.createEl("div", {
+        text: `🩸 Este Zettel já resetou ${item.resetCount}x. Com ${this.data.settings.leechThreshold}x vira leech e some da fila.`,
+        cls: "microreader-leech-warning",
+      });
+    }
     card.createEl("div", {
       text: `Origem: ${item.sourceFilePath} (Parágrafo #${item.paragraphIndex + 1})`,
       cls: "microreader-subtitle",
@@ -61,35 +77,49 @@ export class ReviewModal extends Modal {
     origBox.setText(item.originalText);
 
     card.createEl("label", { text: "Sua Reescrita / Zettelkasten:" });
-    const rewriteBox = card.createDiv({ cls: "microreader-display-box microreader-highlight-box" });
+    const rewriteBox = card.createDiv({
+      cls: "microreader-display-box microreader-highlight-box",
+    });
     rewriteBox.setText(item.rewrittenText);
 
-    card.createEl("p", { text: "Avalie sua retenção (SM-2):", cls: "microreader-rating-label" });
+    card.createEl("p", {
+      text: "Como foi lembrar disso?",
+      cls: "microreader-rating-label",
+    });
 
     const ratingContainer = card.createDiv({ cls: "microreader-ratings-row" });
-    const ratings = [
-      { score: 0, label: "0: Esqueci", cls: "mr-btn-0" },
-      { score: 1, label: "1: Muito difícil", cls: "mr-btn-1" },
-      { score: 2, label: "2: Difícil", cls: "mr-btn-2" },
-      { score: 3, label: "3: Bom com esforço", cls: "mr-btn-3" },
-      { score: 4, label: "4: Fácil", cls: "mr-btn-4" },
-      { score: 5, label: "5: Perfeito", cls: "mr-btn-5" },
-    ];
 
-    for (const r of ratings) {
-      const btn = ratingContainer.createEl("button", { text: r.label, cls: r.cls });
-      btn.onclick = () => this.handleRate(r.score);
-    }
+    const btnUp = ratingContainer.createEl("button", {
+      text: "🔺 +Prioridade (não lembro bem)",
+      cls: "mr-btn-up",
+    });
+    btnUp.onclick = () => this.handleRate("up");
+
+    const btnDown = ratingContainer.createEl("button", {
+      text: "🔻 -Prioridade (lembro bem)",
+      cls: "mr-btn-down",
+    });
+    btnDown.onclick = () => this.handleRate("down");
   }
 
-  private async handleRate(score: number) {
+  private async handleRate(direction: "up" | "down") {
     const item = this.pendingReviews[this.currentIdx];
-    const updated = SM2Engine.processReviewResult(item, score);
-
+    const leechThreshold = this.data.settings.leechThreshold;
+    const updated = SM2Engine.processIncrementalReview(
+      item,
+      direction,
+      leechThreshold,
+    );
     // Atualiza no registro do plugin
     const idx = this.data.reviews.findIndex((r) => r.id === item.id);
     if (idx !== -1) {
       this.data.reviews[idx] = updated;
+    }
+
+    if (updated.isLeech && !item.isLeech) {
+      new Notice(
+        `🩸 "${item.zettelTitle}" virou um leech (${updated.resetCount} resets) e vai sumir da fila até você resolver manualmente.`,
+      );
     }
 
     // Registra estatística diária
