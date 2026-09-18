@@ -1,4 +1,5 @@
 import { App, TFile } from "obsidian";
+import { ZettelFooterParser } from "./parser";
 
 export class ZettelManager {
   constructor(private app: App) {}
@@ -54,7 +55,7 @@ export class ZettelManager {
     const sourceBaseName = sourceFile.basename;
     const tagFormatted = requiredTag.startsWith("#") ? requiredTag : `#${requiredTag}`;
 
-    const noteBody = `${content}\n\n---\n${tagFormatted}\n\n**Origem:** [[${sourceBaseName}]]\n`;
+    const noteBody = `${content}\n\n<!-- microreader:footer -->\n${tagFormatted}\n\n**Origem:** [[${sourceBaseName}]]\n`;
 
     // Salva na mesma pasta do arquivo de origem ou na raiz
     const parentPath = sourceFile.parent?.path || "";
@@ -63,7 +64,7 @@ export class ZettelManager {
     const existing = this.app.vault.getAbstractFileByPath(filePath);
     if (existing instanceof TFile) {
       // Se já existe, anexa
-      await this.app.vault.append(existing, `\n\n---\n${content}\n\n**Origem:** [[${sourceBaseName}]]\n`);
+      await this.mergeWithExistingZettel(existing, content, sourceFile);
       return existing;
     }
 
@@ -79,8 +80,15 @@ export class ZettelManager {
     sourceFile: TFile
   ): Promise<void> {
     const sourceBaseName = sourceFile.basename;
-    const appendText = `\n\n---\n### Adição Incremental\n${content}\n\n**Origem:** [[${sourceBaseName}]]\n`;
-    await this.app.vault.append(targetFile, appendText);
+    const fileContent = await this.app.vault.read(targetFile);
+    const { body, footer } = ZettelFooterParser.split(fileContent);
+
+    const newBody = `${body}\n\n---\n### Adição Incremental\n${content}`;
+    const newFooter = footer.includes(sourceBaseName)
+      ? footer
+      : `${footer}\n**Origem:** [[${sourceBaseName}]]`;
+
+    await this.app.vault.modify(targetFile, ZettelFooterParser.join(newBody, newFooter));
   }
 
   /**

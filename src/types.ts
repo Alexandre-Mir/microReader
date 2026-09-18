@@ -15,6 +15,7 @@ export interface ReviewItem {
   lastStep: number; // tamanho do último passo aplicado (começa em 0)
   resetCount: number; // quantas vezes esse Zettel já bateu +100
   isLeech: boolean; // true qunado resetCount >= limiar configurado
+  rewriteHistory: { date: string; text: string }[];
 }
 
 export interface DocumentState {

@@ -1,10 +1,13 @@
-import { App, Modal, Notice, setTooltip } from "obsidian";
+import { App, Modal, Notice, setTooltip, TFile } from "obsidian";
 import { ReviewItem, PluginData } from "../types";
 import { SM2Engine, getTodayString } from "../sm2";
+import { ZettelFooterParser, ZettelSplit } from "../parser";
 
 export class ReviewModal extends Modal {
   private currentIdx = 0;
   private pendingReviews: ReviewItem[] = [];
+  private currentZettelFile: TFile | null = null;
+  private currentSplit: ZettelSplit | null = null;
 
   constructor(
     app: App,
@@ -40,6 +43,19 @@ export class ReviewModal extends Modal {
     this.renderCurrentReview();
   }
 
+  private async resolveAndLoadZettel(item: ReviewItem): Promise<boolean> {
+    const file = this.app.metadataCache.getFirstLinkpathDest(item.zettelTitle, "");
+    if (!(file instanceof TFile)) {
+      this.currentZettelFile = null;
+      this.currentSplit = null;
+      return false;
+    }
+    const content = await this.app.vault.read(file);
+    this.currentZettelFile = file;
+    this.currentSplit = ZettelFooterParser.split(content);
+    return true;
+  }
+
   private renderCurrentReview() {
     const { contentEl } = this;
     contentEl.empty();
@@ -47,86 +63,113 @@ export class ReviewModal extends Modal {
     const item = this.pendingReviews[this.currentIdx];
     const total = this.pendingReviews.length;
 
-    // Alerta do Gatekeeper
-    const alertBox = contentEl.createDiv({
-      cls: "microreader-gatekeeper-banner",
+    // resolve de forma assíncrona, mas a UI precisa aguardar — ver nota abaixo
+    this.resolveAndLoadZettel(item).then((found) => {
+      if (!found) {
+        this.renderNotFoundState(item);
+      } else {
+        this.renderReviewForm(item, total);
+      }
     });
+  }
+
+  private renderNotFoundState(item: ReviewItem) {
+    const { contentEl } = this;
+    const card = contentEl.createDiv({ cls: "microreader-card" });
+    card.createEl("h3", { text: `⚠️ Zettel não encontrado` });
+    card.createEl("p", {
+      text: `O arquivo "${item.zettelTitle}" foi deletado ou renomeado?`,
+    });
+
+    const btnRow = card.createDiv({ cls: "microreader-action-row" });
+
+    const btnRemove = btnRow.createEl("button", { text: "Remover da Fila", cls: "microreader-btn-danger" });
+    btnRemove.onclick = async () => {
+      this.data.reviews = this.data.reviews.filter((r) => r.id !== item.id);
+      await this.onSaveData();
+      this.advanceToNext();
+    };
+
+    const btnSkip = btnRow.createEl("button", { text: "Pular", cls: "microreader-btn-merge" });
+    btnSkip.onclick = () => this.advanceToNext();
+  }
+
+  private renderReviewForm(item: ReviewItem, total: number) {
+    const { contentEl } = this;
+
+    const alertBox = contentEl.createDiv({ cls: "microreader-gatekeeper-banner" });
     alertBox.createEl("span", {
-      text: `⚠️ Gatekeeper Ativo: Revisão ${this.currentIdx + 1} de ${total}. Conclua para liberar nova leitura.`,
+      text: `⚠️ Gatekeeper Ativo: Revisão ${this.currentIdx + 1} de ${total}.`,
     });
 
     const card = contentEl.createDiv({ cls: "microreader-card" });
+    card.createEl("h3", { text: `Nota: [[${item.zettelTitle}]]`, cls: "microreader-title" });
 
-    card.createEl("h3", {
-      text: `Nota: [[${item.zettelTitle}]]`,
-      cls: "microreader-title",
-    });
     if (item.resetCount > 0) {
       card.createEl("div", {
-        text: `🩸 Este Zettel já resetou ${item.resetCount}x. Com ${this.data.settings.leechThreshold}x vira leech e some da fila.`,
+        text: `🩸 Já resetou ${item.resetCount}x. Com ${this.data.settings.leechThreshold}x vira leech.`,
         cls: "microreader-leech-warning",
       });
     }
-    card.createEl("div", {
-      text: `Origem: ${item.sourceFilePath} (Parágrafo #${item.paragraphIndex + 1})`,
-      cls: "microreader-subtitle",
-    });
 
-    card.createEl("label", { text: "Texto Original:" });
+    card.createEl("label", { text: "Texto Original (fonte, somente leitura):" });
     const origBox = card.createDiv({ cls: "microreader-display-box" });
     origBox.setText(item.originalText);
 
-    card.createEl("label", { text: "Sua Reescrita / Zettelkasten:" });
-    const rewriteBox = card.createDiv({
-      cls: "microreader-display-box microreader-highlight-box",
-    });
-    rewriteBox.setText(item.rewrittenText);
-
-    card.createEl("p", {
-      text: "Como foi lembrar disso?",
-      cls: "microreader-rating-label",
-    });
+    card.createEl("label", { text: "Sua Reescrita (edite livremente):" });
+    const textarea = card.createEl("textarea", { cls: "microreader-textarea" });
+    const originalBody = this.currentSplit!.body;
+    textarea.value = originalBody;
 
     const ratingContainer = card.createDiv({ cls: "microreader-ratings-row" });
+    const btnUp = ratingContainer.createEl("button", { text: "🔺 +Prioridade (não lembrei bem)", cls: "mr-btn-up" });
+    const btnDown = ratingContainer.createEl("button", { text: "🔻 -Prioridade (lembrei bem)", cls: "mr-btn-down" });
 
-    const btnUp = ratingContainer.createEl("button", {
-      text: "🔺 +Prioridade (não lembro bem)",
-      cls: "mr-btn-up",
-    });
-    btnUp.onclick = () => this.handleRate("up");
+    btnUp.onclick = () => this.handleRate(item, "up", textarea.value, originalBody);
+    btnDown.onclick = () => this.handleRate(item, "down", textarea.value, originalBody);
 
-    const btnDown = ratingContainer.createEl("button", {
-      text: "🔻 -Prioridade (lembro bem)",
-      cls: "mr-btn-down",
-    });
-    btnDown.onclick = () => this.handleRate("down");
+    setTimeout(() => textarea.focus(), 50);
   }
 
-  private async handleRate(direction: "up" | "down") {
-    const item = this.pendingReviews[this.currentIdx];
+  private async handleRate(
+    item: ReviewItem,
+    direction: "up" | "down",
+    newBody: string,
+    oldBody: string
+  ) {
+    const trimmedNew = newBody.trim();
+    const trimmedOld = oldBody.trim();
+
+    if (trimmedNew !== trimmedOld) {
+      item.rewriteHistory.push({
+        date: new Date().toISOString(),
+        text: trimmedOld,
+      });
+
+      const fullContent = ZettelFooterParser.join(trimmedNew, this.currentSplit!.footer);
+      await this.app.vault.modify(this.currentZettelFile!, fullContent);
+    }
+
     const leechThreshold = this.data.settings.leechThreshold;
-    const updated = SM2Engine.processIncrementalReview(
-      item,
-      direction,
-      leechThreshold,
-    );
-    // Atualiza no registro do plugin
+    const updated = SM2Engine.processIncrementalReview(item, direction, leechThreshold);
+
     const idx = this.data.reviews.findIndex((r) => r.id === item.id);
     if (idx !== -1) {
-      this.data.reviews[idx] = updated;
+      this.data.reviews[idx] = { ...updated, rewriteHistory: item.rewriteHistory };
     }
 
     if (updated.isLeech && !item.isLeech) {
-      new Notice(
-        `🩸 "${item.zettelTitle}" virou um leech (${updated.resetCount} resets) e vai sumir da fila até você resolver manualmente.`,
-      );
+      new Notice(`🩸 "${item.zettelTitle}" virou leech (${updated.resetCount} resets).`);
     }
 
-    // Registra estatística diária
     const today = getTodayString();
     this.data.dailyStats[today] = (this.data.dailyStats[today] || 0) + 1;
     await this.onSaveData();
 
+    this.advanceToNext();
+  }
+
+  private advanceToNext() {
     this.currentIdx++;
     if (this.currentIdx < this.pendingReviews.length) {
       this.renderCurrentReview();

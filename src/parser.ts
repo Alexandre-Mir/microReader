@@ -212,3 +212,51 @@ export class MarkdownParser {
     return { paragraphs, footnotes };
   }
 }
+
+const FOOTER_MARKER = "<!-- microreader:footer -->";
+
+export interface ZettelSplit {
+  body: string;
+  footer: string; // inclui o marcador
+}
+
+export class ZettelFooterParser {
+  static split(fileContent: string): ZettelSplit {
+    const markerIdx = fileContent.indexOf(FOOTER_MARKER);
+    if (markerIdx !== -1) {
+      return {
+        body: fileContent.substring(0, markerIdx).trim(),
+        footer: fileContent.substring(markerIdx).trim(),
+      };
+    }
+    return this.migrateLegacyFormat(fileContent);
+  }
+
+  private static migrateLegacyFormat(fileContent: string): ZettelSplit {
+    const origemRegex = /\*\*Origem:\*\*\s*\[\[([^\]]+)\]\]/g;
+    const origens: string[] = [];
+    let match;
+    while ((match = origemRegex.exec(fileContent)) !== null) {
+      origens.push(match[1]);
+    }
+
+    let body = fileContent
+      .replace(/^#zettel\s*$/gm, "")
+      .replace(/\*\*Origem:\*\*\s*\[\[([^\]]+)\]\]/g, "")
+      .replace(/\n{3,}/g, "\n\n") // limpa excesso de linhas em branco deixado pela remoção
+      .trim();
+
+    const origensUnicas = [...new Set(origens)];
+    const footerLines = [
+      FOOTER_MARKER,
+      "#zettel",
+      ...origensUnicas.map((o) => `**Origem:** [[${o}]]`),
+    ];
+
+    return { body, footer: footerLines.join("\n") };
+  }
+
+  static join(body: string, footer: string): string {
+    return `${body.trim()}\n\n${footer.trim()}\n`;
+  }
+}

@@ -496,6 +496,7 @@ export class ReadingModal extends Modal {
         lastStep: 0,
         resetCount: 0,
         isLeech: false,
+        rewriteHistory: [],
       });
     }
 
