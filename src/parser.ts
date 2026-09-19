@@ -212,6 +212,145 @@ export class MarkdownParser {
 
     return { paragraphs, footnotes };
   }
+
+  /**
+   * Substitui um parágrafo por índice estrutural com verificação segura de ocorrências
+   */
+  static replaceParagraph(
+    content: string,
+    target: ReplaceParagraphTarget,
+    replacement: string
+  ): ReplaceParagraphResult {
+    const isCRLF = content.includes("\r\n");
+    const normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+    // Determina o texto de busca: prefere rawText se estiver presente no conteúdo
+    let searchStr = "";
+    if (target.rawText && normalized.includes(target.rawText)) {
+      searchStr = target.rawText;
+    } else if (target.text && normalized.includes(target.text)) {
+      searchStr = target.text;
+    } else {
+      // Tenta localizar através do parse estrutural caso o texto tenha quebras de linha normalizadas
+      const parsedInitial = this.parse(normalized);
+      if (target.index !== undefined && parsedInitial.paragraphs[target.index]) {
+        const found = parsedInitial.paragraphs[target.index];
+        if (found.rawText && normalized.includes(found.rawText)) {
+          searchStr = found.rawText;
+        } else if (found.text && normalized.includes(found.text)) {
+          searchStr = found.text;
+        }
+      }
+    }
+
+    if (!searchStr) {
+      return {
+        success: false,
+        occurrencesCount: 0,
+        error: "Parágrafo não encontrado no conteúdo do arquivo.",
+      };
+    }
+
+    // Localiza ocorrências como blocos autônomos
+    const findBlockOccurrences = (haystack: string, needle: string): number[] => {
+      const positions: number[] = [];
+      let pos = 0;
+      while ((pos = haystack.indexOf(needle, pos)) !== -1) {
+        const before = haystack.slice(0, pos);
+        const after = haystack.slice(pos + needle.length);
+
+        const validBefore = pos === 0 || /\n\s*$/.test(before) || before.endsWith("---\n");
+        const validAfter = pos + needle.length === haystack.length || /^\s*\n/.test(after) || after.startsWith("\n");
+
+        if (validBefore && validAfter) {
+          positions.push(pos);
+        }
+        pos += needle.length;
+      }
+      return positions;
+    };
+
+    let occurrences = findBlockOccurrences(normalized, searchStr);
+    if (occurrences.length === 0) {
+      let pos = 0;
+      while ((pos = normalized.indexOf(searchStr, pos)) !== -1) {
+        occurrences.push(pos);
+        pos += searchStr.length;
+      }
+    }
+
+    const count = occurrences.length;
+
+    // Se houver exatamente uma ocorrência e target.index não foi passado, substitui diretamente
+    if (count === 1 && target.index === undefined) {
+      const updated = normalized.slice(0, occurrences[0]) + replacement + normalized.slice(occurrences[0] + searchStr.length);
+      return {
+        success: true,
+        updatedContent: isCRLF ? updated.replace(/\n/g, "\r\n") : updated,
+        occurrencesCount: 1,
+      };
+    }
+
+    // Com índice estrutural ou mais de 1 ocorrência, realiza a validação estrutural via parse
+    const parsed = this.parse(normalized);
+
+    if (target.index === undefined || target.index < 0 || target.index >= parsed.paragraphs.length) {
+      return {
+        success: false,
+        occurrencesCount: count,
+        error: `Existem ${count} ocorrências do parágrafo, mas o índice estrutural (${target.index}) é inválido.`,
+      };
+    }
+
+    const blockAtIndex = parsed.paragraphs[target.index];
+    const textMatches = blockAtIndex.text === target.text || (target.rawText && blockAtIndex.rawText === target.rawText);
+    if (!textMatches) {
+      return {
+        success: false,
+        occurrencesCount: count,
+        error: `O bloco no índice ${target.index} não corresponde ao parágrafo esperado. O arquivo pode ter sido modificado externamente.`,
+      };
+    }
+
+    // Determina qual ocorrência corresponde a este índice estrutural
+    let occurrenceIndex = 0;
+    for (let i = 0; i < target.index; i++) {
+      const p = parsed.paragraphs[i];
+      if (p.text === target.text || (target.rawText && p.rawText === target.rawText)) {
+        occurrenceIndex++;
+      }
+    }
+
+    if (occurrenceIndex >= occurrences.length) {
+      return {
+        success: false,
+        occurrencesCount: count,
+        error: `Inconsistência estrutural: esperado ocorrência ${occurrenceIndex + 1}, mas apenas ${occurrences.length} encontradas.`,
+      };
+    }
+
+    const targetPos = occurrences[occurrenceIndex];
+    const updated = normalized.slice(0, targetPos) + replacement + normalized.slice(targetPos + searchStr.length);
+
+    return {
+      success: true,
+      updatedContent: isCRLF ? updated.replace(/\n/g, "\r\n") : updated,
+      occurrencesCount: count,
+    };
+  }
+}
+
+export interface ReplaceParagraphTarget {
+  text: string;
+  rawText?: string;
+  index?: number;
+}
+
+export interface ReplaceParagraphResult {
+  success: boolean;
+  updatedContent?: string;
+  occurrencesCount: number;
+  error?: string;
 }
 
 const FOOTER_MARKER = "<!-- microreader:footer -->";
