@@ -97,7 +97,8 @@ export class ZettelManager {
   async replaceParagraphWithLinks(
     sourceFile: TFile,
     originalParagraphText: string,
-    zettelTitles: string[]
+    zettelTitles: string[],
+    rawParagraphText?: string
   ): Promise<void> {
     const linkStr = zettelTitles
       .map((t) => `[[${t.replace(/^\[\[|\]\]$/g, "").trim()}]]`)
@@ -105,18 +106,43 @@ export class ZettelManager {
 
     const fileContent = await this.app.vault.read(sourceFile);
 
-    // Substitui a primeira ocorrência do texto do parágrafo pelo conjunto de links
+    // 1. Tenta substituir pelo texto bruto original exato
+    if (rawParagraphText && fileContent.includes(rawParagraphText)) {
+      const updated = fileContent.replace(rawParagraphText, linkStr);
+      await this.app.vault.modify(sourceFile, updated);
+      return;
+    }
+
+    // 2. Tenta substituir pelo texto formatado (com espaços normalizados)
     if (fileContent.includes(originalParagraphText)) {
       const updated = fileContent.replace(originalParagraphText, linkStr);
       await this.app.vault.modify(sourceFile, updated);
+      return;
+    }
+
+    // 3. Busca por blocos no arquivo com tolerância a quebras de linha
+    const blocks = fileContent.split(/\n\s*\n/);
+    const targetIdx = blocks.findIndex((b) => {
+      const normalizedB = b
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+        .join(" ");
+      return normalizedB === originalParagraphText;
+    });
+
+    if (targetIdx !== -1) {
+      blocks[targetIdx] = linkStr;
+      await this.app.vault.modify(sourceFile, blocks.join("\n\n"));
     }
   }
 
   async replaceParagraphWithLink(
     sourceFile: TFile,
     originalParagraphText: string,
-    zettelTitle: string
+    zettelTitle: string,
+    rawParagraphText?: string
   ): Promise<void> {
-    return this.replaceParagraphWithLinks(sourceFile, originalParagraphText, [zettelTitle]);
+    return this.replaceParagraphWithLinks(sourceFile, originalParagraphText, [zettelTitle], rawParagraphText);
   }
 }

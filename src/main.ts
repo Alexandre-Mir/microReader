@@ -134,6 +134,40 @@ export default class MicroReaderPlugin extends Plugin {
       DEFAULT_SETTINGS,
       this.data.settings,
     );
+
+    // Normalização defensiva para dados criados em versões anteriores
+    if (Array.isArray(this.data.reviews)) {
+      this.data.reviews = this.data.reviews.map((r) => ({
+        ...r,
+        stageIndex: typeof r.stageIndex === "number" && !isNaN(r.stageIndex) ? r.stageIndex : 0,
+        lastDirection: r.lastDirection ?? null,
+        lastStep: typeof r.lastStep === "number" && !isNaN(r.lastStep) ? r.lastStep : 0,
+        resetCount: typeof r.resetCount === "number" && !isNaN(r.resetCount) ? r.resetCount : 0,
+        isLeech: Boolean(r.isLeech),
+        rewriteHistory: Array.isArray(r.rewriteHistory) ? r.rewriteHistory : [],
+        repetitionNumber: typeof r.repetitionNumber === "number" && !isNaN(r.repetitionNumber) ? r.repetitionNumber : 0,
+        intervalDays: typeof r.intervalDays === "number" && !isNaN(r.intervalDays) ? r.intervalDays : 1,
+        easinessFactor: typeof r.easinessFactor === "number" && !isNaN(r.easinessFactor) ? r.easinessFactor : 2.5,
+      }));
+    } else {
+      this.data.reviews = [];
+    }
+
+    if (!this.data.documents || typeof this.data.documents !== "object") {
+      this.data.documents = {};
+    } else {
+      for (const key of Object.keys(this.data.documents)) {
+        const doc = this.data.documents[key];
+        if (doc) {
+          doc.completedParagraphs = Array.isArray(doc.completedParagraphs) ? doc.completedParagraphs : [];
+          doc.ignoredParagraphs = Array.isArray(doc.ignoredParagraphs) ? doc.ignoredParagraphs : [];
+        }
+      }
+    }
+
+    if (!this.data.dailyStats || typeof this.data.dailyStats !== "object") {
+      this.data.dailyStats = {};
+    }
   }
 
   async savePluginData() {

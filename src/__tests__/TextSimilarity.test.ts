@@ -15,4 +15,20 @@ describe("TextSimilarity", () => {
 
     expect(similarity).toBeLessThan(20);
   });
+
+  it("deve detectar similaridade alta quando pequenas alterações são feitas", () => {
+    const original = "O Iluminismo representou uma mudança profunda na história do pensamento europeu ocidental.";
+    const slightlyModified = "O Iluminismo representou uma mudança profunda na história do pensamento europeu moderno.";
+    const similarity = TextSimilarity.calculateSimilarityPercent(original, slightlyModified);
+
+    expect(similarity).toBeGreaterThan(55);
+  });
+
+  it("deve aprovar quando o usuário reescreve com suas próprias palavras", () => {
+    const original = "O Iluminismo representou uma mudança profunda na história do pensamento europeu ocidental.";
+    const rewritten = "A era das luzes transformou radicalmente a filosofia e a ciência no continente europeu.";
+    const similarity = TextSimilarity.calculateSimilarityPercent(original, rewritten);
+
+    expect(similarity).toBeLessThanOrEqual(55);
+  });
 });

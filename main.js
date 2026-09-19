@@ -70,16 +70,20 @@ var SM2Engine = class _SM2Engine {
   static hasPendingReviews(data) {
     return _SM2Engine.getPendingReviews(data).length > 0;
   }
-  static processIncrementalReview(item, direction, leechThreshold) {
-    const step = direction === item.lastDirection ? item.lastStep * 2 : 1;
-    let newStageIndex = item.stageIndex;
+  static processIncrementalReview(item, direction, leechThreshold = 3) {
+    const lastDirection = item.lastDirection ?? null;
+    const lastStep = typeof item.lastStep === "number" && !isNaN(item.lastStep) ? item.lastStep : 0;
+    const stageIndex = typeof item.stageIndex === "number" && !isNaN(item.stageIndex) ? item.stageIndex : 0;
+    const resetCount = typeof item.resetCount === "number" && !isNaN(item.resetCount) ? item.resetCount : 0;
+    const step = direction === lastDirection ? Math.max(1, lastStep * 2) : 1;
+    let newStageIndex = stageIndex;
     if (direction === "up") {
-      newStageIndex = Math.min(100, item.stageIndex + step);
+      newStageIndex = Math.min(100, stageIndex + step);
     } else {
-      newStageIndex = Math.max(-100, item.stageIndex - step);
+      newStageIndex = Math.max(-100, stageIndex - step);
     }
     if (newStageIndex >= 100) {
-      const newResetCount = item.resetCount + 1;
+      const newResetCount = resetCount + 1;
       return {
         ...item,
         stageIndex: 0,
@@ -90,13 +94,14 @@ var SM2Engine = class _SM2Engine {
         repetitionNumber: 0,
         intervalDays: 1,
         dueDate: getTomorrowString(),
-        lastReviewedAt: (/* @__PURE__ */ new Date()).toISOString()
+        lastReviewedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        rewriteHistory: Array.isArray(item.rewriteHistory) ? item.rewriteHistory : []
       };
     }
     const q = 2.5 - newStageIndex / 100 * 2.5;
-    let rep = item.repetitionNumber;
-    let interval = item.intervalDays;
-    let ef = item.easinessFactor;
+    let rep = typeof item.repetitionNumber === "number" && !isNaN(item.repetitionNumber) ? item.repetitionNumber : 0;
+    let interval = typeof item.intervalDays === "number" && !isNaN(item.intervalDays) ? item.intervalDays : 1;
+    let ef = typeof item.easinessFactor === "number" && !isNaN(item.easinessFactor) ? item.easinessFactor : 2.5;
     ef = ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
     if (ef < 1.3)
       ef = 1.3;
@@ -114,17 +119,20 @@ var SM2Engine = class _SM2Engine {
       rep += 1;
     }
     const today = getTodayString();
-    const nextDue = addDays(today, interval);
+    const nextDue = addDays(today, Math.max(1, interval));
     return {
       ...item,
       stageIndex: newStageIndex,
       lastDirection: direction,
       lastStep: step,
+      resetCount,
+      isLeech: Boolean(item.isLeech),
       repetitionNumber: rep,
-      intervalDays: interval,
-      easinessFactor: ef,
+      intervalDays: Math.max(1, interval),
+      easinessFactor: Number(ef.toFixed(2)),
       dueDate: nextDue,
-      lastReviewedAt: (/* @__PURE__ */ new Date()).toISOString()
+      lastReviewedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      rewriteHistory: Array.isArray(item.rewriteHistory) ? item.rewriteHistory : []
     };
   }
 };
@@ -287,6 +295,7 @@ var MarkdownParser = class {
         paragraphs.push({
           index: globalIdx,
           text: cleanText,
+          rawText: trimmed,
           section: currentSection,
           internalLinks: this.extractInternalLinks(cleanText)
         });
@@ -413,16 +422,31 @@ ${content}`;
   /**
    * Substitui o parágrafo no arquivo de origem por um ou mais links [[Nota Criada]]
    */
-  async replaceParagraphWithLinks(sourceFile, originalParagraphText, zettelTitles) {
+  async replaceParagraphWithLinks(sourceFile, originalParagraphText, zettelTitles, rawParagraphText) {
     const linkStr = zettelTitles.map((t) => `[[${t.replace(/^\[\[|\]\]$/g, "").trim()}]]`).join(" ");
     const fileContent = await this.app.vault.read(sourceFile);
+    if (rawParagraphText && fileContent.includes(rawParagraphText)) {
+      const updated = fileContent.replace(rawParagraphText, linkStr);
+      await this.app.vault.modify(sourceFile, updated);
+      return;
+    }
     if (fileContent.includes(originalParagraphText)) {
       const updated = fileContent.replace(originalParagraphText, linkStr);
       await this.app.vault.modify(sourceFile, updated);
+      return;
+    }
+    const blocks = fileContent.split(/\n\s*\n/);
+    const targetIdx = blocks.findIndex((b) => {
+      const normalizedB = b.split("\n").map((l) => l.trim()).filter((l) => l.length > 0).join(" ");
+      return normalizedB === originalParagraphText;
+    });
+    if (targetIdx !== -1) {
+      blocks[targetIdx] = linkStr;
+      await this.app.vault.modify(sourceFile, blocks.join("\n\n"));
     }
   }
-  async replaceParagraphWithLink(sourceFile, originalParagraphText, zettelTitle) {
-    return this.replaceParagraphWithLinks(sourceFile, originalParagraphText, [zettelTitle]);
+  async replaceParagraphWithLink(sourceFile, originalParagraphText, zettelTitle, rawParagraphText) {
+    return this.replaceParagraphWithLinks(sourceFile, originalParagraphText, [zettelTitle], rawParagraphText);
   }
 };
 
@@ -659,6 +683,11 @@ var ReadingModal = class extends import_obsidian3.Modal {
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
       const val = textarea.value;
+      if (val.trim().length === 0) {
+        new import_obsidian3.Notice("Digite sua s\xEDntese antes de desmembrar com '---'.");
+        textarea.focus();
+        return;
+      }
       if (start !== end) {
         const before = val.substring(0, start).trimEnd();
         const selected = val.substring(start, end).trim();
@@ -678,6 +707,7 @@ var ReadingModal = class extends import_obsidian3.Modal {
       updateTitleFields();
       validate();
       textarea.focus();
+      new import_obsidian3.Notice("\u2702\uFE0F Delimitador '---' inserido. Defina os t\xEDtulos para cada nota.");
     };
     const actionRow = formCard.createDiv({ cls: "microreader-action-row" });
     const btnIgnore = actionRow.createEl("button", {
@@ -689,11 +719,16 @@ var ReadingModal = class extends import_obsidian3.Modal {
       "Descarta este par\xE1grafo sem criar revis\xE3o nem nota Zettel"
     );
     btnIgnore.onclick = async () => {
-      docState.ignoredParagraphs.push(this.currentIdx);
-      docState.currentParagraphIndex = this.currentIdx + 1;
-      await this.onSaveData();
-      this.currentIdx++;
-      this.renderParagraphView();
+      try {
+        docState.ignoredParagraphs.push(this.currentIdx);
+        docState.currentParagraphIndex = this.currentIdx + 1;
+        await this.onSaveData();
+        new import_obsidian3.Notice("\u{1F5D1}\uFE0F Par\xE1grafo ignorado.");
+        this.currentIdx++;
+        this.renderParagraphView();
+      } catch (err) {
+        new import_obsidian3.Notice(`Erro ao ignorar par\xE1grafo: ${err?.message || err}`);
+      }
     };
     const btnMerge = actionRow.createEl("button", {
       text: "\u{1F517} Mesclar com Nota Existente",
@@ -707,29 +742,42 @@ var ReadingModal = class extends import_obsidian3.Modal {
       const zettelFiles = this.zettelManager.getAllZettelFiles(
         this.data.settings.requiredTag
       );
+      if (zettelFiles.length === 0) {
+        new import_obsidian3.Notice(`Nenhuma nota com a tag #${this.data.settings.requiredTag} encontrada no cofre para mesclar.`);
+        return;
+      }
+      const text = textarea.value.trim();
+      const words = text.split(/\s+/).filter((w) => w.length > 0).length;
+      if (words < this.data.settings.minRewriteWords) {
+        new import_obsidian3.Notice(
+          `Escreva ao menos ${this.data.settings.minRewriteWords} palavras antes de mesclar.`
+        );
+        textarea.focus();
+        return;
+      }
       new ZettelSuggestModal(this.app, zettelFiles, async (chosen) => {
-        const text = textarea.value.trim();
-        if (text.split(/\s+/).length < this.data.settings.minRewriteWords) {
-          new import_obsidian3.Notice(
-            `Escreva ao menos ${this.data.settings.minRewriteWords} palavras antes de mesclar.`
+        try {
+          await this.zettelManager.mergeWithExistingZettel(
+            chosen,
+            text,
+            this.currentFile
           );
-          return;
+          await this.zettelManager.replaceParagraphWithLink(
+            this.currentFile,
+            currentParagraph.text,
+            chosen.basename,
+            currentParagraph.rawText
+          );
+          new import_obsidian3.Notice(`\u2705 Conte\xFAdo mesclado com [[${chosen.basename}]]!`);
+          await this.scheduleReviewAndAdvance(
+            [chosen.basename],
+            currentParagraph,
+            [text]
+          );
+        } catch (err) {
+          console.error("[microReader] Erro ao mesclar Zettel:", err);
+          new import_obsidian3.Notice(`Erro ao mesclar: ${err?.message || err}`);
         }
-        await this.zettelManager.mergeWithExistingZettel(
-          chosen,
-          text,
-          this.currentFile
-        );
-        await this.zettelManager.replaceParagraphWithLink(
-          this.currentFile,
-          currentParagraph.text,
-          chosen.basename
-        );
-        await this.scheduleReviewAndAdvance(
-          [chosen.basename],
-          currentParagraph,
-          [text]
-        );
       }).open();
     };
     const statusLabel = actionRow.createEl("span", {
@@ -739,8 +787,7 @@ var ReadingModal = class extends import_obsidian3.Modal {
       text: "Criar Nota(s) Zettel e Avan\xE7ar (Ctrl+Enter)",
       cls: "mod-cta"
     });
-    btnSubmit.disabled = true;
-    const validate = () => {
+    const validate = (showFeedback = false) => {
       let hasHighSimilarity = false;
       let maxFoundSimilarity = 0;
       const sections = getSections();
@@ -749,7 +796,7 @@ var ReadingModal = class extends import_obsidian3.Modal {
       for (const section of sections) {
         const similarity = TextSimilarity.calculateSimilarityPercent(
           currentParagraph.text,
-          textarea.value
+          section
         );
         if (similarity > maxFoundSimilarity) {
           maxFoundSimilarity = similarity;
@@ -759,65 +806,96 @@ var ReadingModal = class extends import_obsidian3.Modal {
         }
       }
       if (hasHighSimilarity) {
-        btnSubmit.disabled = true;
+        btnSubmit.addClass("is-disabled");
         statusLabel.setText(
           `\u26A0\uFE0F Muito parecido com o original (${maxFoundSimilarity}% de similaridade, m\xE1x. ${this.data.settings.maxSimilarityPercent}%)`
         );
         statusLabel.addClass("is-error");
-      } else {
-        if (totalWords < this.data.settings.minRewriteWords) {
-          statusLabel.setText(
-            `M\xEDnimo de ${this.data.settings.minRewriteWords} palavras (${totalWords}/${this.data.settings.minRewriteWords})`
+        if (showFeedback) {
+          new import_obsidian3.Notice(
+            `\u26A0\uFE0F O texto \xE9 muito parecido com o original (${maxFoundSimilarity}% de similaridade). Escreva com suas pr\xF3prias palavras.`
           );
-          btnSubmit.disabled = true;
+          textarea.focus();
+        }
+        return false;
+      }
+      if (totalWords < this.data.settings.minRewriteWords) {
+        btnSubmit.addClass("is-disabled");
+        statusLabel.setText(
+          `M\xEDnimo de ${this.data.settings.minRewriteWords} palavras (${totalWords}/${this.data.settings.minRewriteWords})`
+        );
+        statusLabel.removeClass("is-error");
+        if (showFeedback) {
+          new import_obsidian3.Notice(
+            `\u26A0\uFE0F Escreva no m\xEDnimo ${this.data.settings.minRewriteWords} palavras na s\xEDntese antes de avan\xE7ar (${totalWords}/${this.data.settings.minRewriteWords}).`
+          );
+          textarea.focus();
+        }
+        return false;
+      }
+      for (let i = 0; i < count; i++) {
+        const inp = titleInputs[i];
+        if (!inp || inp.value.trim().length < 2) {
+          btnSubmit.addClass("is-disabled");
+          statusLabel.setText(`\u26A0\uFE0F Defina o t\xEDtulo da Nota #${i + 1}`);
+          statusLabel.addClass("is-error");
+          if (showFeedback) {
+            new import_obsidian3.Notice(`\u26A0\uFE0F Defina o t\xEDtulo da Nota #${i + 1} antes de avan\xE7ar.`);
+            inp?.focus();
+          }
           return false;
         }
-        for (let i = 0; i < count; i++) {
-          const inp = titleInputs[i];
-          if (!inp || inp.value.trim().length < 2) {
-            statusLabel.setText(`\u26A0\uFE0F Defina o t\xEDtulo da Nota #${i + 1}`);
-            btnSubmit.disabled = true;
-            return false;
-          }
-        }
-        const noteStr = count > 1 ? `${count} notas desmembradas` : "1 nota";
-        statusLabel.setText(
-          `\u2713 Pronto para criar ${noteStr} (${totalWords} palavras)`
-        );
-        btnSubmit.disabled = false;
-        return true;
       }
+      btnSubmit.removeClass("is-disabled");
+      statusLabel.removeClass("is-error");
+      const noteStr = count > 1 ? `${count} notas desmembradas` : "1 nota";
+      statusLabel.setText(
+        `\u2713 Pronto para criar ${noteStr} (${totalWords} palavras)`
+      );
+      return true;
     };
     textarea.oninput = () => {
       updateTitleFields();
-      validate();
+      validate(false);
     };
     updateTitleFields();
-    const doSubmit = async () => {
-      if (!validate())
+    validate(false);
+    const doSubmit = async (fromUserAction = false) => {
+      if (!validate(fromUserAction))
         return;
       const sections = getSections();
       const titles = titleInputs.map((inp) => inp.value.trim());
-      for (let i = 0; i < sections.length; i++) {
-        await this.zettelManager.createZettelNote(
-          titles[i],
-          sections[i],
+      try {
+        btnSubmit.disabled = true;
+        for (let i = 0; i < sections.length; i++) {
+          await this.zettelManager.createZettelNote(
+            titles[i],
+            sections[i],
+            this.currentFile,
+            this.data.settings.requiredTag
+          );
+        }
+        await this.zettelManager.replaceParagraphWithLinks(
           this.currentFile,
-          this.data.settings.requiredTag
+          currentParagraph.text,
+          titles,
+          currentParagraph.rawText
         );
+        new import_obsidian3.Notice(
+          titles.length > 1 ? `\u2705 ${titles.length} notas Zettel criadas com sucesso!` : `\u2705 Nota Zettel criada com sucesso!`
+        );
+        await this.scheduleReviewAndAdvance(titles, currentParagraph, sections);
+      } catch (err) {
+        btnSubmit.disabled = false;
+        console.error("[microReader] Erro ao avan\xE7ar par\xE1grafo:", err);
+        new import_obsidian3.Notice(`Erro ao criar nota Zettel: ${err?.message || err}`);
       }
-      await this.zettelManager.replaceParagraphWithLinks(
-        this.currentFile,
-        currentParagraph.text,
-        titles
-      );
-      await this.scheduleReviewAndAdvance(titles, currentParagraph, sections);
     };
-    btnSubmit.onclick = doSubmit;
+    btnSubmit.onclick = () => doSubmit(true);
     textarea.onkeydown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
-        doSubmit();
+        doSubmit(true);
       }
     };
     setTimeout(() => textarea.focus(), 50);
@@ -941,27 +1019,43 @@ var ReviewModal = class extends import_obsidian4.Modal {
       } else {
         this.renderReviewForm(item, total);
       }
+    }).catch((err) => {
+      console.error("[microReader] Erro ao carregar Zettel para revis\xE3o:", err);
+      this.renderNotFoundState(item);
     });
   }
   renderNotFoundState(item) {
     const { contentEl } = this;
+    contentEl.empty();
     const card = contentEl.createDiv({ cls: "microreader-card" });
     card.createEl("h3", { text: `\u26A0\uFE0F Zettel n\xE3o encontrado` });
     card.createEl("p", {
-      text: `O arquivo "${item.zettelTitle}" foi deletado ou renomeado?`
+      text: `O arquivo "${item.zettelTitle}" n\xE3o foi localizado no cofre (pode ter sido renomeado ou exclu\xEDdo).`
     });
     const btnRow = card.createDiv({ cls: "microreader-action-row" });
-    const btnRemove = btnRow.createEl("button", { text: "Remover da Fila", cls: "microreader-btn-danger" });
+    const btnRemove = btnRow.createEl("button", { text: "\u{1F5D1}\uFE0F Remover da Fila", cls: "microreader-btn-danger" });
     btnRemove.onclick = async () => {
-      this.data.reviews = this.data.reviews.filter((r) => r.id !== item.id);
-      await this.onSaveData();
+      try {
+        this.data.reviews = this.data.reviews.filter((r) => r.id !== item.id);
+        await this.onSaveData();
+        new import_obsidian4.Notice(`Item "${item.zettelTitle}" removido da fila.`);
+        this.advanceToNext();
+      } catch (err) {
+        new import_obsidian4.Notice(`Erro ao remover: ${err?.message || err}`);
+      }
+    };
+    const btnSkip = btnRow.createEl("button", { text: "\u23ED\uFE0F Pular", cls: "microreader-btn-merge" });
+    btnSkip.onclick = () => {
+      new import_obsidian4.Notice("Item pulado nesta sess\xE3o.");
       this.advanceToNext();
     };
-    const btnSkip = btnRow.createEl("button", { text: "Pular", cls: "microreader-btn-merge" });
-    btnSkip.onclick = () => this.advanceToNext();
   }
   renderReviewForm(item, total) {
     const { contentEl } = this;
+    contentEl.empty();
+    if (!Array.isArray(item.rewriteHistory)) {
+      item.rewriteHistory = [];
+    }
     const alertBox = contentEl.createDiv({ cls: "microreader-gatekeeper-banner" });
     alertBox.createEl("span", {
       text: `\u26A0\uFE0F Gatekeeper Ativo: Revis\xE3o ${this.currentIdx + 1} de ${total}.`
@@ -979,39 +1073,120 @@ var ReviewModal = class extends import_obsidian4.Modal {
     origBox.setText(item.originalText);
     card.createEl("label", { text: "Sua Reescrita (edite livremente):" });
     const textarea = card.createEl("textarea", { cls: "microreader-textarea" });
-    const originalBody = this.currentSplit.body;
+    const originalBody = this.currentSplit ? this.currentSplit.body : item.rewrittenText;
     textarea.value = originalBody;
+    const statusLabel = card.createEl("span", {
+      cls: "microreader-status-label"
+    });
     const ratingContainer = card.createDiv({ cls: "microreader-ratings-row" });
     const btnUp = ratingContainer.createEl("button", { text: "\u{1F53A} +Prioridade (n\xE3o lembrei bem)", cls: "mr-btn-up" });
     const btnDown = ratingContainer.createEl("button", { text: "\u{1F53B} -Prioridade (lembrei bem)", cls: "mr-btn-down" });
-    btnUp.onclick = () => this.handleRate(item, "up", textarea.value, originalBody);
-    btnDown.onclick = () => this.handleRate(item, "down", textarea.value, originalBody);
+    (0, import_obsidian4.setTooltip)(btnUp, "Aumenta a prioridade/frequ\xEAncia desta nota (atalho: Alt+1)");
+    (0, import_obsidian4.setTooltip)(btnDown, "Diminui a frequ\xEAncia pois voc\xEA lembrou bem (atalho: Alt+2)");
+    const validate = (showFeedback = false) => {
+      const trimmedNew = (textarea.value || "").trim();
+      const trimmedOld = (originalBody || "").trim();
+      if (trimmedNew === trimmedOld) {
+        btnUp.removeClass("is-disabled");
+        btnDown.removeClass("is-disabled");
+        statusLabel.setText("");
+        statusLabel.removeClass("is-error");
+        return true;
+      }
+      const similarity = TextSimilarity.calculateSimilarityPercent(originalBody, textarea.value);
+      const maxSimilarity = this.data.settings.maxSimilarityPercent;
+      if (similarity > maxSimilarity) {
+        btnUp.addClass("is-disabled");
+        btnDown.addClass("is-disabled");
+        statusLabel.setText(
+          `\u26A0\uFE0F Muito parecido com o texto anterior (${similarity}% de similaridade, m\xE1x. ${maxSimilarity}%)`
+        );
+        statusLabel.addClass("is-error");
+        if (showFeedback) {
+          new import_obsidian4.Notice(
+            `\u26A0\uFE0F O texto reescrito \xE9 muito parecido com o anterior (${similarity}% de similaridade). Reescreva com mais profundidade ou mantenha o texto original.`
+          );
+          textarea.focus();
+        }
+        return false;
+      }
+      btnUp.removeClass("is-disabled");
+      btnDown.removeClass("is-disabled");
+      statusLabel.setText(`\u2713 Reescrita v\xE1lida (${similarity}% de similaridade)`);
+      statusLabel.removeClass("is-error");
+      return true;
+    };
+    textarea.oninput = () => {
+      validate(false);
+    };
+    validate(false);
+    btnUp.onclick = () => {
+      if (!validate(true))
+        return;
+      this.handleRate(item, "up", textarea.value, originalBody);
+    };
+    btnDown.onclick = () => {
+      if (!validate(true))
+        return;
+      this.handleRate(item, "down", textarea.value, originalBody);
+    };
+    textarea.onkeydown = (e) => {
+      if (e.altKey && e.key === "1") {
+        e.preventDefault();
+        if (!validate(true))
+          return;
+        this.handleRate(item, "up", textarea.value, originalBody);
+      } else if (e.altKey && e.key === "2") {
+        e.preventDefault();
+        if (!validate(true))
+          return;
+        this.handleRate(item, "down", textarea.value, originalBody);
+      }
+    };
     setTimeout(() => textarea.focus(), 50);
   }
   async handleRate(item, direction, newBody, oldBody) {
-    const trimmedNew = newBody.trim();
-    const trimmedOld = oldBody.trim();
-    if (trimmedNew !== trimmedOld) {
-      item.rewriteHistory.push({
-        date: (/* @__PURE__ */ new Date()).toISOString(),
-        text: trimmedOld
-      });
-      const fullContent = ZettelFooterParser.join(trimmedNew, this.currentSplit.footer);
-      await this.app.vault.modify(this.currentZettelFile, fullContent);
+    try {
+      if (!Array.isArray(item.rewriteHistory)) {
+        item.rewriteHistory = [];
+      }
+      const trimmedNew = (newBody || "").trim();
+      const trimmedOld = (oldBody || "").trim();
+      if (trimmedNew !== trimmedOld) {
+        const similarity = TextSimilarity.calculateSimilarityPercent(oldBody, newBody);
+        const maxSimilarity = this.data.settings.maxSimilarityPercent;
+        if (similarity > maxSimilarity) {
+          new import_obsidian4.Notice(
+            `\u26A0\uFE0F Reescrita bloqueada: muito similar \xE0 anterior (${similarity}%).`
+          );
+          return;
+        }
+        item.rewriteHistory.push({
+          date: (/* @__PURE__ */ new Date()).toISOString(),
+          text: trimmedOld
+        });
+        if (this.currentZettelFile && this.currentSplit) {
+          const fullContent = ZettelFooterParser.join(trimmedNew, this.currentSplit.footer);
+          await this.app.vault.modify(this.currentZettelFile, fullContent);
+        }
+      }
+      const leechThreshold = this.data.settings.leechThreshold || 3;
+      const updated = SM2Engine.processIncrementalReview(item, direction, leechThreshold);
+      const idx = this.data.reviews.findIndex((r) => r.id === item.id);
+      if (idx !== -1) {
+        this.data.reviews[idx] = { ...updated, rewriteHistory: item.rewriteHistory };
+      }
+      if (updated.isLeech && !item.isLeech) {
+        new import_obsidian4.Notice(`\u{1FA78} "${item.zettelTitle}" virou leech (${updated.resetCount} resets).`);
+      }
+      const today = getTodayString();
+      this.data.dailyStats[today] = (this.data.dailyStats[today] || 0) + 1;
+      await this.onSaveData();
+      this.advanceToNext();
+    } catch (err) {
+      console.error("[microReader] Erro ao registrar revis\xE3o:", err);
+      new import_obsidian4.Notice(`Erro ao registrar revis\xE3o: ${err?.message || err}`);
     }
-    const leechThreshold = this.data.settings.leechThreshold;
-    const updated = SM2Engine.processIncrementalReview(item, direction, leechThreshold);
-    const idx = this.data.reviews.findIndex((r) => r.id === item.id);
-    if (idx !== -1) {
-      this.data.reviews[idx] = { ...updated, rewriteHistory: item.rewriteHistory };
-    }
-    if (updated.isLeech && !item.isLeech) {
-      new import_obsidian4.Notice(`\u{1FA78} "${item.zettelTitle}" virou leech (${updated.resetCount} resets).`);
-    }
-    const today = getTodayString();
-    this.data.dailyStats[today] = (this.data.dailyStats[today] || 0) + 1;
-    await this.onSaveData();
-    this.advanceToNext();
   }
   advanceToNext() {
     this.currentIdx++;
@@ -1136,6 +1311,36 @@ var MicroReaderPlugin = class extends import_obsidian5.Plugin {
       DEFAULT_SETTINGS,
       this.data.settings
     );
+    if (Array.isArray(this.data.reviews)) {
+      this.data.reviews = this.data.reviews.map((r) => ({
+        ...r,
+        stageIndex: typeof r.stageIndex === "number" && !isNaN(r.stageIndex) ? r.stageIndex : 0,
+        lastDirection: r.lastDirection ?? null,
+        lastStep: typeof r.lastStep === "number" && !isNaN(r.lastStep) ? r.lastStep : 0,
+        resetCount: typeof r.resetCount === "number" && !isNaN(r.resetCount) ? r.resetCount : 0,
+        isLeech: Boolean(r.isLeech),
+        rewriteHistory: Array.isArray(r.rewriteHistory) ? r.rewriteHistory : [],
+        repetitionNumber: typeof r.repetitionNumber === "number" && !isNaN(r.repetitionNumber) ? r.repetitionNumber : 0,
+        intervalDays: typeof r.intervalDays === "number" && !isNaN(r.intervalDays) ? r.intervalDays : 1,
+        easinessFactor: typeof r.easinessFactor === "number" && !isNaN(r.easinessFactor) ? r.easinessFactor : 2.5
+      }));
+    } else {
+      this.data.reviews = [];
+    }
+    if (!this.data.documents || typeof this.data.documents !== "object") {
+      this.data.documents = {};
+    } else {
+      for (const key of Object.keys(this.data.documents)) {
+        const doc = this.data.documents[key];
+        if (doc) {
+          doc.completedParagraphs = Array.isArray(doc.completedParagraphs) ? doc.completedParagraphs : [];
+          doc.ignoredParagraphs = Array.isArray(doc.ignoredParagraphs) ? doc.ignoredParagraphs : [];
+        }
+      }
+    }
+    if (!this.data.dailyStats || typeof this.data.dailyStats !== "object") {
+      this.data.dailyStats = {};
+    }
   }
   async savePluginData() {
     await this.saveData(this.data);

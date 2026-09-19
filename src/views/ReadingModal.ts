@@ -268,6 +268,12 @@ export class ReadingModal extends Modal {
       const end = textarea.selectionEnd;
       const val = textarea.value;
 
+      if (val.trim().length === 0) {
+        new Notice("Digite sua síntese antes de desmembrar com '---'.");
+        textarea.focus();
+        return;
+      }
+
       if (start !== end) {
         const before = val.substring(0, start).trimEnd();
         const selected = val.substring(start, end).trim();
@@ -289,6 +295,7 @@ export class ReadingModal extends Modal {
       updateTitleFields();
       validate();
       textarea.focus();
+      new Notice("✂️ Delimitador '---' inserido. Defina os títulos para cada nota.");
     };
 
     // Linha de Ações
@@ -304,11 +311,16 @@ export class ReadingModal extends Modal {
       "Descarta este parágrafo sem criar revisão nem nota Zettel",
     );
     btnIgnore.onclick = async () => {
-      docState.ignoredParagraphs.push(this.currentIdx);
-      docState.currentParagraphIndex = this.currentIdx + 1;
-      await this.onSaveData();
-      this.currentIdx++;
-      this.renderParagraphView();
+      try {
+        docState.ignoredParagraphs.push(this.currentIdx);
+        docState.currentParagraphIndex = this.currentIdx + 1;
+        await this.onSaveData();
+        new Notice("🗑️ Parágrafo ignorado.");
+        this.currentIdx++;
+        this.renderParagraphView();
+      } catch (err: any) {
+        new Notice(`Erro ao ignorar parágrafo: ${err?.message || err}`);
+      }
     };
 
     // Botão Mesclar com Nota Existente
@@ -324,33 +336,47 @@ export class ReadingModal extends Modal {
       const zettelFiles = this.zettelManager.getAllZettelFiles(
         this.data.settings.requiredTag,
       );
+      if (zettelFiles.length === 0) {
+        new Notice(`Nenhuma nota com a tag #${this.data.settings.requiredTag} encontrada no cofre para mesclar.`);
+        return;
+      }
+
+      const text = textarea.value.trim();
+      const words = text.split(/\s+/).filter((w) => w.length > 0).length;
+      if (words < this.data.settings.minRewriteWords) {
+        new Notice(
+          `Escreva ao menos ${this.data.settings.minRewriteWords} palavras antes de mesclar.`,
+        );
+        textarea.focus();
+        return;
+      }
+
       new ZettelSuggestModal(this.app, zettelFiles, async (chosen) => {
-        const text = textarea.value.trim();
-        if (text.split(/\s+/).length < this.data.settings.minRewriteWords) {
-          new Notice(
-            `Escreva ao menos ${this.data.settings.minRewriteWords} palavras antes de mesclar.`,
+        try {
+          // Anexa na nota existente
+          await this.zettelManager.mergeWithExistingZettel(
+            chosen,
+            text,
+            this.currentFile,
           );
-          return;
+          // Substitui parágrafo no arquivo original
+          await this.zettelManager.replaceParagraphWithLink(
+            this.currentFile,
+            currentParagraph.text,
+            chosen.basename,
+            currentParagraph.rawText,
+          );
+
+          new Notice(`✅ Conteúdo mesclado com [[${chosen.basename}]]!`);
+          await this.scheduleReviewAndAdvance(
+            [chosen.basename],
+            currentParagraph,
+            [text],
+          );
+        } catch (err: any) {
+          console.error("[microReader] Erro ao mesclar Zettel:", err);
+          new Notice(`Erro ao mesclar: ${err?.message || err}`);
         }
-
-        // Anexa na nota existente
-        await this.zettelManager.mergeWithExistingZettel(
-          chosen,
-          text,
-          this.currentFile,
-        );
-        // Substitui parágrafo no arquivo original
-        await this.zettelManager.replaceParagraphWithLink(
-          this.currentFile,
-          currentParagraph.text,
-          chosen.basename,
-        );
-
-        await this.scheduleReviewAndAdvance(
-          [chosen.basename],
-          currentParagraph,
-          [text],
-        );
       }).open();
     };
 
@@ -363,9 +389,8 @@ export class ReadingModal extends Modal {
       text: "Criar Nota(s) Zettel e Avançar (Ctrl+Enter)",
       cls: "mod-cta",
     });
-    btnSubmit.disabled = true;
 
-    const validate = () => {
+    const validate = (showFeedback = false): boolean => {
       let hasHighSimilarity = false;
       let maxFoundSimilarity = 0;
 
@@ -379,7 +404,7 @@ export class ReadingModal extends Modal {
       for (const section of sections) {
         const similarity = TextSimilarity.calculateSimilarityPercent(
           currentParagraph.text,
-          textarea.value,
+          section,
         );
         if (similarity > maxFoundSimilarity) {
           maxFoundSimilarity = similarity;
@@ -390,78 +415,114 @@ export class ReadingModal extends Modal {
       }
 
       if (hasHighSimilarity) {
-        btnSubmit.disabled = true;
+        btnSubmit.addClass("is-disabled");
         statusLabel.setText(
           `⚠️ Muito parecido com o original (${maxFoundSimilarity}% de similaridade, máx. ${this.data.settings.maxSimilarityPercent}%)`,
         );
         statusLabel.addClass("is-error");
-      } else {
-        if (totalWords < this.data.settings.minRewriteWords) {
-          statusLabel.setText(
-            `Mínimo de ${this.data.settings.minRewriteWords} palavras (${totalWords}/${this.data.settings.minRewriteWords})`,
+        if (showFeedback) {
+          new Notice(
+            `⚠️ O texto é muito parecido com o original (${maxFoundSimilarity}% de similaridade). Escreva com suas próprias palavras.`,
           );
-          btnSubmit.disabled = true;
+          textarea.focus();
+        }
+        return false;
+      }
+
+      if (totalWords < this.data.settings.minRewriteWords) {
+        btnSubmit.addClass("is-disabled");
+        statusLabel.setText(
+          `Mínimo de ${this.data.settings.minRewriteWords} palavras (${totalWords}/${this.data.settings.minRewriteWords})`,
+        );
+        statusLabel.removeClass("is-error");
+        if (showFeedback) {
+          new Notice(
+            `⚠️ Escreva no mínimo ${this.data.settings.minRewriteWords} palavras na síntese antes de avançar (${totalWords}/${this.data.settings.minRewriteWords}).`,
+          );
+          textarea.focus();
+        }
+        return false;
+      }
+
+      for (let i = 0; i < count; i++) {
+        const inp = titleInputs[i];
+        if (!inp || inp.value.trim().length < 2) {
+          btnSubmit.addClass("is-disabled");
+          statusLabel.setText(`⚠️ Defina o título da Nota #${i + 1}`);
+          statusLabel.addClass("is-error");
+          if (showFeedback) {
+            new Notice(`⚠️ Defina o título da Nota #${i + 1} antes de avançar.`);
+            inp?.focus();
+          }
           return false;
         }
-
-        for (let i = 0; i < count; i++) {
-          const inp = titleInputs[i];
-          if (!inp || inp.value.trim().length < 2) {
-            statusLabel.setText(`⚠️ Defina o título da Nota #${i + 1}`);
-            btnSubmit.disabled = true;
-            return false;
-          }
-        }
-
-        const noteStr = count > 1 ? `${count} notas desmembradas` : "1 nota";
-        statusLabel.setText(
-          `✓ Pronto para criar ${noteStr} (${totalWords} palavras)`,
-        );
-        btnSubmit.disabled = false;
-        return true;
       }
+
+      btnSubmit.removeClass("is-disabled");
+      statusLabel.removeClass("is-error");
+      const noteStr = count > 1 ? `${count} notas desmembradas` : "1 nota";
+      statusLabel.setText(
+        `✓ Pronto para criar ${noteStr} (${totalWords} palavras)`,
+      );
+      return true;
     };
 
     textarea.oninput = () => {
       updateTitleFields();
-      validate();
+      validate(false);
     };
 
-    // Inicializa campos de títulos
+    // Inicializa campos de títulos e validação inicial
     updateTitleFields();
+    validate(false);
 
-    const doSubmit = async () => {
-      if (!validate()) return;
+    const doSubmit = async (fromUserAction = false) => {
+      if (!validate(fromUserAction)) return;
       const sections = getSections();
       const titles = titleInputs.map((inp) => inp.value.trim());
 
-      // 1. Cria cada uma das notas atômicas no cofre
-      for (let i = 0; i < sections.length; i++) {
-        await this.zettelManager.createZettelNote(
-          titles[i],
-          sections[i],
+      try {
+        btnSubmit.disabled = true;
+
+        // 1. Cria cada uma das notas atômicas no cofre
+        for (let i = 0; i < sections.length; i++) {
+          await this.zettelManager.createZettelNote(
+            titles[i],
+            sections[i],
+            this.currentFile,
+            this.data.settings.requiredTag,
+          );
+        }
+
+        // 2. Substitui no arquivo de origem pelos links de todas as notas criadas
+        await this.zettelManager.replaceParagraphWithLinks(
           this.currentFile,
-          this.data.settings.requiredTag,
+          currentParagraph.text,
+          titles,
+          currentParagraph.rawText,
         );
+
+        new Notice(
+          titles.length > 1
+            ? `✅ ${titles.length} notas Zettel criadas com sucesso!`
+            : `✅ Nota Zettel criada com sucesso!`,
+        );
+
+        // 3. Agenda revisões SM-2 para cada nota desmembrada e avança
+        await this.scheduleReviewAndAdvance(titles, currentParagraph, sections);
+      } catch (err: any) {
+        btnSubmit.disabled = false;
+        console.error("[microReader] Erro ao avançar parágrafo:", err);
+        new Notice(`Erro ao criar nota Zettel: ${err?.message || err}`);
       }
-
-      // 2. Substitui no arquivo de origem pelos links de todas as notas criadas: [[Nota 1]] [[Nota 2]]
-      await this.zettelManager.replaceParagraphWithLinks(
-        this.currentFile,
-        currentParagraph.text,
-        titles,
-      );
-
-      // 3. Agenda revisões SM-2 para cada nota desmembrada e avança
-      await this.scheduleReviewAndAdvance(titles, currentParagraph, sections);
     };
 
-    btnSubmit.onclick = doSubmit;
+    btnSubmit.onclick = () => doSubmit(true);
 
     textarea.onkeydown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
-        doSubmit();
+        doSubmit(true);
       }
     };
 

@@ -50,23 +50,27 @@ export class SM2Engine {
   static processIncrementalReview(
     item: ReviewItem,
     direction: "up" | "down",
-    leechThreshold: number,
+    leechThreshold: number = 3,
   ): ReviewItem {
+    const lastDirection = item.lastDirection ?? null;
+    const lastStep = typeof item.lastStep === "number" && !isNaN(item.lastStep) ? item.lastStep : 0;
+    const stageIndex = typeof item.stageIndex === "number" && !isNaN(item.stageIndex) ? item.stageIndex : 0;
+    const resetCount = typeof item.resetCount === "number" && !isNaN(item.resetCount) ? item.resetCount : 0;
+
     // calcula o tamanho do passo: dobra se repetiu a mesma direção, senão volta a 1
-    const step = direction === item.lastDirection ? item.lastStep * 2 : 1;
+    const step = direction === lastDirection ? Math.max(1, lastStep * 2) : 1;
 
     // aplica o passo ao stageIndex, saturando em -100 / +100
-
-    let newStageIndex = item.stageIndex;
+    let newStageIndex = stageIndex;
     if (direction === "up") {
-      newStageIndex = Math.min(100, item.stageIndex + step);
+      newStageIndex = Math.min(100, stageIndex + step);
     } else {
-      newStageIndex = Math.max(-100, item.stageIndex - step);
+      newStageIndex = Math.max(-100, stageIndex - step);
     }
 
     // se bateu o teto (+100), dispara o reset de "esqueci"
     if (newStageIndex >= 100) {
-      const newResetCount = item.resetCount + 1;
+      const newResetCount = resetCount + 1;
       return {
         ...item,
         stageIndex: 0,
@@ -78,16 +82,17 @@ export class SM2Engine {
         intervalDays: 1,
         dueDate: getTomorrowString(),
         lastReviewedAt: new Date().toISOString(),
+        rewriteHistory: Array.isArray(item.rewriteHistory) ? item.rewriteHistory : [],
       };
     }
 
     // caso normal: converte o stageIndex numa qualidade SM-2
     const q = 2.5 - (newStageIndex / 100) * 2.5;
 
-    // roda a fórmula clássica dp SM-2 com esse q
-    let rep = item.repetitionNumber;
-    let interval = item.intervalDays;
-    let ef = item.easinessFactor;
+    // roda a fórmula clássica do SM-2 com esse q
+    let rep = typeof item.repetitionNumber === "number" && !isNaN(item.repetitionNumber) ? item.repetitionNumber : 0;
+    let interval = typeof item.intervalDays === "number" && !isNaN(item.intervalDays) ? item.intervalDays : 1;
+    let ef = typeof item.easinessFactor === "number" && !isNaN(item.easinessFactor) ? item.easinessFactor : 2.5;
 
     ef = ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
     if (ef < 1.3) ef = 1.3;
@@ -107,18 +112,21 @@ export class SM2Engine {
     }
 
     const today = getTodayString();
-    const nextDue = addDays(today, interval);
+    const nextDue = addDays(today, Math.max(1, interval));
 
     return {
       ...item,
       stageIndex: newStageIndex,
       lastDirection: direction,
       lastStep: step,
+      resetCount: resetCount,
+      isLeech: Boolean(item.isLeech),
       repetitionNumber: rep,
-      intervalDays: interval,
-      easinessFactor: ef,
+      intervalDays: Math.max(1, interval),
+      easinessFactor: Number(ef.toFixed(2)),
       dueDate: nextDue,
       lastReviewedAt: new Date().toISOString(),
+      rewriteHistory: Array.isArray(item.rewriteHistory) ? item.rewriteHistory : [],
     };
   }
 }

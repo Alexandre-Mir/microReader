@@ -202,6 +202,7 @@ export class MarkdownParser {
         paragraphs.push({
           index: globalIdx,
           text: cleanText,
+          rawText: trimmed,
           section: currentSection,
           internalLinks: this.extractInternalLinks(cleanText),
         });

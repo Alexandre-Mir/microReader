@@ -48,6 +48,7 @@ export interface PluginData {
 export interface ParagraphBlock {
   index: number;
   text: string;
+  rawText?: string;
   section: number;
   internalLinks: string[]; // nomes das notas linkadas com [[x]]
 }

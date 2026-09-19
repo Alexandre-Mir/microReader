@@ -338,12 +338,45 @@
   opacity: 0.85;
 }
 
+.mr-btn-up {
+  background-color: #d9534f !important;
+  color: #ffffff !important;
+}
+
+.mr-btn-up:hover {
+  background-color: #c9302c !important;
+}
+
+.mr-btn-down {
+  background-color: #2e7d32 !important;
+  color: #ffffff !important;
+}
+
+.mr-btn-down:hover {
+  background-color: #1b5e20 !important;
+}
+
 .mr-btn-0 { background-color: #e53935; }
 .mr-btn-1 { background-color: #fb8c00; }
 .mr-btn-2 { background-color: #fdd835; color: #111 !important; }
 .mr-btn-3 { background-color: #43a047; }
 .mr-btn-4 { background-color: #1e88e5; }
 .mr-btn-5 { background-color: #8e24aa; }
+
+.mod-cta.is-disabled {
+  opacity: 0.55 !important;
+  cursor: pointer !important;
+}
+
+.microreader-ratings-row button.is-disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+}
+
+.microreader-status-label.is-error {
+  color: #eb5757 !important;
+  font-weight: 600;
+}
 
 .microreader-suggest-title {
   font-weight: 600;
