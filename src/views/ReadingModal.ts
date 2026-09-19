@@ -1,3 +1,5 @@
+// Janela de leitura
+
 import { App, Modal, Notice, setTooltip, TFile } from "obsidian";
 import { PluginData, DocumentState, ParagraphBlock } from "../types";
 import { MarkdownParser, TextSimilarity } from "../parser";
@@ -295,7 +297,9 @@ export class ReadingModal extends Modal {
       updateTitleFields();
       validate();
       textarea.focus();
-      new Notice("✂️ Delimitador '---' inserido. Defina os títulos para cada nota.");
+      new Notice(
+        "✂️ Delimitador '---' inserido. Defina os títulos para cada nota.",
+      );
     };
 
     // Linha de Ações
@@ -337,7 +341,9 @@ export class ReadingModal extends Modal {
         this.data.settings.requiredTag,
       );
       if (zettelFiles.length === 0) {
-        new Notice(`Nenhuma nota com a tag #${this.data.settings.requiredTag} encontrada no cofre para mesclar.`);
+        new Notice(
+          `Nenhuma nota com a tag #${this.data.settings.requiredTag} encontrada no cofre para mesclar.`,
+        );
         return;
       }
 
@@ -451,7 +457,9 @@ export class ReadingModal extends Modal {
           statusLabel.setText(`⚠️ Defina o título da Nota #${i + 1}`);
           statusLabel.addClass("is-error");
           if (showFeedback) {
-            new Notice(`⚠️ Defina o título da Nota #${i + 1} antes de avançar.`);
+            new Notice(
+              `⚠️ Defina o título da Nota #${i + 1} antes de avançar.`,
+            );
             inp?.focus();
           }
           return false;

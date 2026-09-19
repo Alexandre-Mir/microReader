@@ -1,13 +1,26 @@
 /* Estilos personalizados do microReader para Obsidian */
 
 /* Container Zen de Leitura */
+.modal:has(.microreader-modal),
+.modal:has(.microreader-zen-modal) {
+  width: 85vw !important;
+  max-width: 1200px !important;
+  height: 85vh !important;
+  padding: 10px !important;
+}
+
+.microreader-modal,
 .microreader-zen-modal {
-  width: 90vw !important;
-  max-width: 960px !important;
-  border-radius: 12px;
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  width: 100% !important;
+  height: 100% !important;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.microreader-modal *,
+.microreader-zen-modal * {
+  box-sizing: border-box !important;
 }
 
 .microreader-reading-container {
@@ -90,7 +103,9 @@
   cursor: pointer;
   display: inline-block;
   vertical-align: super;
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .microreader-footnote-badge:hover {
@@ -206,7 +221,7 @@
 
 .microreader-textarea {
   width: 100%;
-  min-height: 120px;
+  min-height: 300px;
   font-size: 1.1rem;
   line-height: 1.6;
   padding: 14px;
@@ -303,6 +318,8 @@
   font-size: 1.1rem;
   line-height: 1.65;
   color: var(--text-normal);
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .microreader-highlight-box {
@@ -356,12 +373,25 @@
   background-color: #1b5e20 !important;
 }
 
-.mr-btn-0 { background-color: #e53935; }
-.mr-btn-1 { background-color: #fb8c00; }
-.mr-btn-2 { background-color: #fdd835; color: #111 !important; }
-.mr-btn-3 { background-color: #43a047; }
-.mr-btn-4 { background-color: #1e88e5; }
-.mr-btn-5 { background-color: #8e24aa; }
+.mr-btn-0 {
+  background-color: #e53935;
+}
+.mr-btn-1 {
+  background-color: #fb8c00;
+}
+.mr-btn-2 {
+  background-color: #fdd835;
+  color: #111 !important;
+}
+.mr-btn-3 {
+  background-color: #43a047;
+}
+.mr-btn-4 {
+  background-color: #1e88e5;
+}
+.mr-btn-5 {
+  background-color: #8e24aa;
+}
 
 .mod-cta.is-disabled {
   opacity: 0.55 !important;

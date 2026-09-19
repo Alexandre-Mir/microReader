@@ -6,20 +6,16 @@ export interface ZettelMetrics {
 }
 
 export class TextSimilarity {
-  /**
-   * Remove pontuação, números isolados e converte para minúsculas
-   */
+  // Remove pontuação, números isolados e converte para minúsculas
   static tokenize(text: string): string[] {
     return text
       .toLowerCase()
-      .replace(/[^\p{L}\p{N}\s]/gu, " ")
-      .split(/\s+/)
-      .filter((w) => w.length > 1);
+      .replace(/[^\p{L}\p{N}\s]/gu, " ") // remove tudo que não for letra, número ou espaço
+      .split(/\s+/) // separa as palavras por espaços
+      .filter((w) => w.length > 1); //remove palavras de uma letra só
   }
 
-  /**
-   * Gera conjunto de bi-gramas (pares de palavras consecutivas)
-   */
+  // Gera conjunto de bi-gramas
   static getBigrams(tokens: string[]): Set<string> {
     const bigrams = new Set<string>();
     for (let i = 0; i < tokens.length - 1; i++) {
@@ -28,10 +24,11 @@ export class TextSimilarity {
     return bigrams;
   }
 
-  /**
-   * Calcula similaridade de Jaccard baseada em bi-gramas (0 a 100%)
-   */
-  static calculateSimilarityPercent(original: string, rewritten: string): number {
+  // Calcula similaridade de Jaccard baseada em bi-gramas (0 a 100%)
+  static calculateSimilarityPercent(
+    original: string,
+    rewritten: string,
+  ): number {
     const origTokens = this.tokenize(original);
     const rewTokens = this.tokenize(rewritten);
 
@@ -41,10 +38,12 @@ export class TextSimilarity {
     if (origTokens.length < 3 || rewTokens.length < 3) {
       const origSet = new Set(origTokens);
       const rewSet = new Set(rewTokens);
+
       let intersection = 0;
       for (const t of rewSet) {
         if (origSet.has(t)) intersection++;
       }
+
       const union = new Set([...origSet, ...rewSet]).size;
       return union === 0 ? 0 : Math.round((intersection / union) * 100);
     }
@@ -70,7 +69,9 @@ export class TextSimilarity {
    */
   static evaluateZettelLength(text: string): ZettelMetrics {
     const trimmed = text.trim();
-    const words = trimmed ? trimmed.split(/\s+/).filter((w) => w.length > 0).length : 0;
+    const words = trimmed
+      ? trimmed.split(/\s+/).filter((w) => w.length > 0).length
+      : 0;
     const chars = trimmed.length;
 
     if (words < 40) {
@@ -109,7 +110,10 @@ export class MarkdownParser {
   /**
    * Extrai notas de rodapé estilo Obsidian: [^1]: texto
    */
-  static extractFootnotes(content: string): { cleanContent: string; footnotes: Record<string, string> } {
+  static extractFootnotes(content: string): {
+    cleanContent: string;
+    footnotes: Record<string, string>;
+  } {
     const footnotes: Record<string, string> = {};
     const lines = content.split("\n");
     const remainingLines: string[] = [];
@@ -122,7 +126,10 @@ export class MarkdownParser {
       if (match) {
         currentFnId = match[1];
         footnotes[currentFnId] = match[2].trim();
-      } else if (currentFnId && (line.startsWith("    ") || line.startsWith("\t"))) {
+      } else if (
+        currentFnId &&
+        (line.startsWith("    ") || line.startsWith("\t"))
+      ) {
         footnotes[currentFnId] += " " + line.trim();
       } else {
         currentFnId = null;
@@ -173,7 +180,9 @@ export class MarkdownParser {
     const contentWithoutFrontmatter = normalized.replace(frontmatterRegex, "");
 
     // 1. Extrai footnotes
-    const { cleanContent, footnotes } = this.extractFootnotes(contentWithoutFrontmatter);
+    const { cleanContent, footnotes } = this.extractFootnotes(
+      contentWithoutFrontmatter,
+    );
 
     // 2. Divide em blocos por linhas em branco
     const rawBlocks = cleanContent.split(/\n\s*\n/);
@@ -219,7 +228,7 @@ export class MarkdownParser {
   static replaceParagraph(
     content: string,
     target: ReplaceParagraphTarget,
-    replacement: string
+    replacement: string,
   ): ReplaceParagraphResult {
     const isCRLF = content.includes("\r\n");
     const normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -233,7 +242,10 @@ export class MarkdownParser {
     } else {
       // Tenta localizar através do parse estrutural caso o texto tenha quebras de linha normalizadas
       const parsedInitial = this.parse(normalized);
-      if (target.index !== undefined && parsedInitial.paragraphs[target.index]) {
+      if (
+        target.index !== undefined &&
+        parsedInitial.paragraphs[target.index]
+      ) {
         const found = parsedInitial.paragraphs[target.index];
         if (found.rawText && normalized.includes(found.rawText)) {
           searchStr = found.rawText;
@@ -252,15 +264,22 @@ export class MarkdownParser {
     }
 
     // Localiza ocorrências como blocos autônomos
-    const findBlockOccurrences = (haystack: string, needle: string): number[] => {
+    const findBlockOccurrences = (
+      haystack: string,
+      needle: string,
+    ): number[] => {
       const positions: number[] = [];
       let pos = 0;
       while ((pos = haystack.indexOf(needle, pos)) !== -1) {
         const before = haystack.slice(0, pos);
         const after = haystack.slice(pos + needle.length);
 
-        const validBefore = pos === 0 || /\n\s*$/.test(before) || before.endsWith("---\n");
-        const validAfter = pos + needle.length === haystack.length || /^\s*\n/.test(after) || after.startsWith("\n");
+        const validBefore =
+          pos === 0 || /\n\s*$/.test(before) || before.endsWith("---\n");
+        const validAfter =
+          pos + needle.length === haystack.length ||
+          /^\s*\n/.test(after) ||
+          after.startsWith("\n");
 
         if (validBefore && validAfter) {
           positions.push(pos);
@@ -283,7 +302,10 @@ export class MarkdownParser {
 
     // Se houver exatamente uma ocorrência e target.index não foi passado, substitui diretamente
     if (count === 1 && target.index === undefined) {
-      const updated = normalized.slice(0, occurrences[0]) + replacement + normalized.slice(occurrences[0] + searchStr.length);
+      const updated =
+        normalized.slice(0, occurrences[0]) +
+        replacement +
+        normalized.slice(occurrences[0] + searchStr.length);
       return {
         success: true,
         updatedContent: isCRLF ? updated.replace(/\n/g, "\r\n") : updated,
@@ -294,7 +316,11 @@ export class MarkdownParser {
     // Com índice estrutural ou mais de 1 ocorrência, realiza a validação estrutural via parse
     const parsed = this.parse(normalized);
 
-    if (target.index === undefined || target.index < 0 || target.index >= parsed.paragraphs.length) {
+    if (
+      target.index === undefined ||
+      target.index < 0 ||
+      target.index >= parsed.paragraphs.length
+    ) {
       return {
         success: false,
         occurrencesCount: count,
@@ -303,7 +329,9 @@ export class MarkdownParser {
     }
 
     const blockAtIndex = parsed.paragraphs[target.index];
-    const textMatches = blockAtIndex.text === target.text || (target.rawText && blockAtIndex.rawText === target.rawText);
+    const textMatches =
+      blockAtIndex.text === target.text ||
+      (target.rawText && blockAtIndex.rawText === target.rawText);
     if (!textMatches) {
       return {
         success: false,
@@ -316,7 +344,10 @@ export class MarkdownParser {
     let occurrenceIndex = 0;
     for (let i = 0; i < target.index; i++) {
       const p = parsed.paragraphs[i];
-      if (p.text === target.text || (target.rawText && p.rawText === target.rawText)) {
+      if (
+        p.text === target.text ||
+        (target.rawText && p.rawText === target.rawText)
+      ) {
         occurrenceIndex++;
       }
     }
@@ -330,7 +361,10 @@ export class MarkdownParser {
     }
 
     const targetPos = occurrences[occurrenceIndex];
-    const updated = normalized.slice(0, targetPos) + replacement + normalized.slice(targetPos + searchStr.length);
+    const updated =
+      normalized.slice(0, targetPos) +
+      replacement +
+      normalized.slice(targetPos + searchStr.length);
 
     return {
       success: true,

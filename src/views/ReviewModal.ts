@@ -44,7 +44,10 @@ export class ReviewModal extends Modal {
   }
 
   private async resolveAndLoadZettel(item: ReviewItem): Promise<boolean> {
-    const file = this.app.metadataCache.getFirstLinkpathDest(item.zettelTitle, "");
+    const file = this.app.metadataCache.getFirstLinkpathDest(
+      item.zettelTitle,
+      "",
+    );
     if (!(file instanceof TFile)) {
       this.currentZettelFile = null;
       this.currentSplit = null;
@@ -72,7 +75,10 @@ export class ReviewModal extends Modal {
         }
       })
       .catch((err) => {
-        console.error("[microReader] Erro ao carregar Zettel para revisão:", err);
+        console.error(
+          "[microReader] Erro ao carregar Zettel para revisão:",
+          err,
+        );
         this.renderNotFoundState(item);
       });
   }
@@ -88,7 +94,10 @@ export class ReviewModal extends Modal {
 
     const btnRow = card.createDiv({ cls: "microreader-action-row" });
 
-    const btnRemove = btnRow.createEl("button", { text: "🗑️ Remover da Fila", cls: "microreader-btn-danger" });
+    const btnRemove = btnRow.createEl("button", {
+      text: "🗑️ Remover da Fila",
+      cls: "microreader-btn-danger",
+    });
     btnRemove.onclick = async () => {
       try {
         this.data.reviews = this.data.reviews.filter((r) => r.id !== item.id);
@@ -100,7 +109,10 @@ export class ReviewModal extends Modal {
       }
     };
 
-    const btnSkip = btnRow.createEl("button", { text: "⏭️ Pular", cls: "microreader-btn-merge" });
+    const btnSkip = btnRow.createEl("button", {
+      text: "⏭️ Pular",
+      cls: "microreader-btn-merge",
+    });
     btnSkip.onclick = () => {
       new Notice("Item pulado nesta sessão.");
       this.advanceToNext();
@@ -115,13 +127,18 @@ export class ReviewModal extends Modal {
       item.rewriteHistory = [];
     }
 
-    const alertBox = contentEl.createDiv({ cls: "microreader-gatekeeper-banner" });
+    const alertBox = contentEl.createDiv({
+      cls: "microreader-gatekeeper-banner",
+    });
     alertBox.createEl("span", {
       text: `⚠️ Gatekeeper Ativo: Revisão ${this.currentIdx + 1} de ${total}.`,
     });
 
     const card = contentEl.createDiv({ cls: "microreader-card" });
-    card.createEl("h3", { text: `Nota: [[${item.zettelTitle}]]`, cls: "microreader-title" });
+    card.createEl("h3", {
+      text: `Nota: [[${item.zettelTitle}]]`,
+      cls: "microreader-title",
+    });
 
     if (item.resetCount > 0) {
       card.createEl("div", {
@@ -130,13 +147,17 @@ export class ReviewModal extends Modal {
       });
     }
 
-    card.createEl("label", { text: "Texto Original (fonte, somente leitura):" });
+    card.createEl("label", {
+      text: "Texto Original (fonte, somente leitura):",
+    });
     const origBox = card.createDiv({ cls: "microreader-display-box" });
     origBox.setText(item.originalText);
 
     card.createEl("label", { text: "Sua Reescrita (edite livremente):" });
     const textarea = card.createEl("textarea", { cls: "microreader-textarea" });
-    const originalBody = this.currentSplit ? this.currentSplit.body : item.rewrittenText;
+    const originalBody = this.currentSplit
+      ? this.currentSplit.body
+      : item.rewrittenText;
     textarea.value = originalBody;
 
     const statusLabel = card.createEl("span", {
@@ -144,10 +165,22 @@ export class ReviewModal extends Modal {
     });
 
     const ratingContainer = card.createDiv({ cls: "microreader-ratings-row" });
-    const btnUp = ratingContainer.createEl("button", { text: "🔺 +Prioridade (não lembrei bem)", cls: "mr-btn-up" });
-    const btnDown = ratingContainer.createEl("button", { text: "🔻 -Prioridade (lembrei bem)", cls: "mr-btn-down" });
-    setTooltip(btnUp, "Aumenta a prioridade/frequência desta nota (atalho: Alt+1)");
-    setTooltip(btnDown, "Diminui a frequência pois você lembrou bem (atalho: Alt+2)");
+    const btnUp = ratingContainer.createEl("button", {
+      text: "🔺 +Prioridade (não lembrei bem)",
+      cls: "mr-btn-up",
+    });
+    const btnDown = ratingContainer.createEl("button", {
+      text: "🔻 -Prioridade (lembrei bem)",
+      cls: "mr-btn-down",
+    });
+    setTooltip(
+      btnUp,
+      "Aumenta a prioridade/frequência desta nota (atalho: Alt+1)",
+    );
+    setTooltip(
+      btnDown,
+      "Diminui a frequência pois você lembrou bem (atalho: Alt+2)",
+    );
 
     const validate = (showFeedback = false): boolean => {
       const trimmedNew = (textarea.value || "").trim();
@@ -163,7 +196,10 @@ export class ReviewModal extends Modal {
       }
 
       // Se foi alterado, calcula a similaridade com o texto original da nota
-      const similarity = TextSimilarity.calculateSimilarityPercent(originalBody, textarea.value);
+      const similarity = TextSimilarity.calculateSimilarityPercent(
+        originalBody,
+        textarea.value,
+      );
       const maxSimilarity = this.data.settings.maxSimilarityPercent;
 
       if (similarity > maxSimilarity) {
@@ -184,7 +220,9 @@ export class ReviewModal extends Modal {
 
       btnUp.removeClass("is-disabled");
       btnDown.removeClass("is-disabled");
-      statusLabel.setText(`✓ Reescrita válida (${similarity}% de similaridade)`);
+      statusLabel.setText(
+        `✓ Reescrita válida (${similarity}% de similaridade)`,
+      );
       statusLabel.removeClass("is-error");
       return true;
     };
@@ -225,7 +263,7 @@ export class ReviewModal extends Modal {
     item: ReviewItem,
     direction: "up" | "down",
     newBody: string,
-    oldBody: string
+    oldBody: string,
   ) {
     try {
       if (!Array.isArray(item.rewriteHistory)) {
@@ -236,7 +274,10 @@ export class ReviewModal extends Modal {
       const trimmedOld = (oldBody || "").trim();
 
       if (trimmedNew !== trimmedOld) {
-        const similarity = TextSimilarity.calculateSimilarityPercent(oldBody, newBody);
+        const similarity = TextSimilarity.calculateSimilarityPercent(
+          oldBody,
+          newBody,
+        );
         const maxSimilarity = this.data.settings.maxSimilarityPercent;
         if (similarity > maxSimilarity) {
           new Notice(
@@ -251,21 +292,33 @@ export class ReviewModal extends Modal {
         });
 
         if (this.currentZettelFile && this.currentSplit) {
-          const fullContent = ZettelFooterParser.join(trimmedNew, this.currentSplit.footer);
+          const fullContent = ZettelFooterParser.join(
+            trimmedNew,
+            this.currentSplit.footer,
+          );
           await this.app.vault.modify(this.currentZettelFile, fullContent);
         }
       }
 
       const leechThreshold = this.data.settings.leechThreshold || 3;
-      const updated = SM2Engine.processIncrementalReview(item, direction, leechThreshold);
+      const updated = SM2Engine.processIncrementalReview(
+        item,
+        direction,
+        leechThreshold,
+      );
 
       const idx = this.data.reviews.findIndex((r) => r.id === item.id);
       if (idx !== -1) {
-        this.data.reviews[idx] = { ...updated, rewriteHistory: item.rewriteHistory };
+        this.data.reviews[idx] = {
+          ...updated,
+          rewriteHistory: item.rewriteHistory,
+        };
       }
 
       if (updated.isLeech && !item.isLeech) {
-        new Notice(`🩸 "${item.zettelTitle}" virou leech (${updated.resetCount} resets).`);
+        new Notice(
+          `🩸 "${item.zettelTitle}" virou leech (${updated.resetCount} resets).`,
+        );
       }
 
       const today = getTodayString();
